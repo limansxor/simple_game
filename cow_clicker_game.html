@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>젖소 클릭 게임</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        .game-container {
+            text-align: center;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        h1 {
+            color: #2E8B57;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .score {
+            font-size: 2em;
+            color: #FF6B6B;
+            margin: 20px 0;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .cow-container {
+            margin: 30px 0;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        .cow-container:hover {
+            transform: scale(1.05);
+        }
+
+        .cow-container:active {
+            transform: scale(0.95);
+        }
+
+        .cow-image {
+            width: 200px;
+            height: 200px;
+            object-fit: contain;
+            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.2));
+            transition: all 0.2s ease;
+            border-radius: 10px;
+        }
+
+        .click-effect {
+            animation: bounce 0.3s ease;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f8ff;
+            border-radius: 10px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2E8B57;
+        }
+
+        .reset-btn {
+            background: #FF6B6B;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.3s ease;
+        }
+
+        .reset-btn:hover {
+            background: #FF5252;
+        }
+
+        .message {
+            margin-top: 15px;
+            font-size: 1.1em;
+            color: #4169E1;
+            font-weight: bold;
+            min-height: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🐄 젖소 클릭 게임</h1>
+        <div class="score" id="score">클릭 수: 0</div>
+        
+        <div class="cow-container" id="cowContainer" onclick="clickCow()">
+            <img class="cow-image" id="cowImage" src="https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=300&h=300&fit=crop" alt="젖소">
+        </div>
+        
+        <div class="message" id="message">젖소를 클릭해보세요!</div>
+        
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-label">총 클릭</div>
+                <div class="stat-value" id="totalClicks">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">현재 젖소</div>
+                <div class="stat-value" id="currentCow">1/8</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">클릭 속도</div>
+                <div class="stat-value" id="clickSpeed">0/초</div>
+            </div>
+        </div>
+        
+        <button class="reset-btn" onclick="resetGame()">게임 리셋</button>
+    </div>
+
+    <script>
+        // 젖소 이미지들 (URL 링크 사용)
+        const cowImages = [
+            'https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=300&h=300&fit=crop', // 일반 젖소
+            'https://images.unsplash.com/photo-1549791711-d7fca65d8ba4?w=300&h=300&fit=crop', // 젖소 2
+            'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&h=300&fit=crop', // 우유
+            'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=300&h=300&fit=crop', // 치즈
+            'https://images.unsplash.com/photo-1623432532623-f8f17825e963?w=300&h=300&fit=crop', // 소 2
+            'https://images.unsplash.com/photo-1544966503-7cc5ac882d5f?w=300&h=300&fit=crop', // 들소
+            'https://images.unsplash.com/photo-1605116982670-93a3cabd2bd3?w=300&h=300&fit=crop', // 물소
+            'https://images.unsplash.com/photo-1558030006-450675393462?w=300&h=300&fit=crop'  // 고기
+        ];
+
+        let clickCount = 0;
+        let currentCowIndex = 0;
+        let clickTimes = [];
+        let gameStartTime = Date.now();
+
+        const scoreElement = document.getElementById('score');
+        const cowImageElement = document.getElementById('cowImage');
+        const cowContainer = document.getElementById('cowContainer');
+        const messageElement = document.getElementById('message');
+        const totalClicksElement = document.getElementById('totalClicks');
+        const currentCowElement = document.getElementById('currentCow');
+        const clickSpeedElement = document.getElementById('clickSpeed');
+
+        // 메시지들
+        const messages = [
+            "좋아요! 계속 클릭하세요!",
+            "젖소가 행복해해요! 🎉",
+            "우유가 나올 것 같아요! 🥛",
+            "치즈도 만들 수 있겠네요! 🧀",
+            "농장의 왕이 되어가고 있어요!",
+            "대단해요! 계속 가세요!",
+            "거의 다 왔어요!",
+            "최고 단계에 도달했어요! 🏆"
+        ];
+
+        function clickCow() {
+            clickCount++;
+            
+            // 클릭 시간 기록 (속도 계산용)
+            const currentTime = Date.now();
+            clickTimes.push(currentTime);
+            
+            // 최근 1초간의 클릭만 유지
+            clickTimes = clickTimes.filter(time => currentTime - time < 1000);
+            
+            // 젖소 이미지 변경 (8번째 클릭마다)
+            if (clickCount % 8 === 0 && currentCowIndex < cowImages.length - 1) {
+                currentCowIndex++;
+                cowImageElement.src = cowImages[currentCowIndex];
+            }
+            
+            // 클릭 효과 애니메이션
+            cowContainer.classList.add('click-effect');
+            setTimeout(() => {
+                cowContainer.classList.remove('click-effect');
+            }, 300);
+            
+            // 정보 업데이트
+            updateDisplay();
+            
+            // 특별한 클릭 수에서 메시지 표시
+            if (clickCount % 5 === 0) {
+                showMessage();
+            }
+        }
+
+        function updateDisplay() {
+            scoreElement.textContent = `클릭 수: ${clickCount}`;
+            totalClicksElement.textContent = clickCount;
+            currentCowElement.textContent = `${currentCowIndex + 1}/${cowImages.length}`;
+            clickSpeedElement.textContent = `${clickTimes.length}/초`;
+        }
+
+        function showMessage() {
+            const messageIndex = Math.min(Math.floor(clickCount / 10), messages.length - 1);
+            messageElement.textContent = messages[messageIndex];
+            
+            // 메시지 페이드 효과
+            messageElement.style.opacity = '0';
+            setTimeout(() => {
+                messageElement.style.opacity = '1';
+            }, 100);
+        }
+
+        function resetGame() {
+            if (confirm('정말로 게임을 리셋하시겠습니까?')) {
+                clickCount = 0;
+                currentCowIndex = 0;
+                clickTimes = [];
+                gameStartTime = Date.now();
+                
+                cowImageElement.src = cowImages[0];
+                messageElement.textContent = '젖소를 클릭해보세요!';
+                
+                updateDisplay();
+            }
+        }
+
+        // 초기 표시 업데이트
+        updateDisplay();
+
+        // 클릭 속도를 주기적으로 업데이트
+        setInterval(() => {
+            const currentTime = Date.now();
+            clickTimes = clickTimes.filter(time => currentTime - time < 1000);
+            clickSpeedElement.textContent = `${clickTimes.length}/초`;
+        }, 100);
+    </script>
+</body>
+</html>
