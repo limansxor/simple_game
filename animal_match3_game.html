@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>동물 3매칭 게임</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes ping {
+            75%, 100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+        @keyframes pulse {
+            50% {
+                opacity: .5;
+            }
+        }
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(-25%);
+                animation-timing-function: cubic-bezier(0.8,0,1,1);
+            }
+            50% {
+                transform: translateY(0);
+                animation-timing-function: cubic-bezier(0,0,0.2,1);
+            }
+        }
+        .animate-ping {
+            animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        .animate-bounce {
+            animation: bounce 1s infinite;
+        }
+        .tile {
+            transition: all 0.2s ease;
+        }
+        .tile:hover {
+            transform: scale(1.05);
+        }
+        .tile.selected {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 2px #3b82f6;
+        }
+        .tile.matched {
+            animation: pulse 2s infinite;
+        }
+        .tile.animating {
+            animation: bounce 1s infinite;
+        }
+        .effect-span {
+            transition: all 0.5s ease;
+        }
+        .effect-span.matched {
+            transform: scale(1.5) rotate(180deg);
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="flex flex-col items-center justify-center p-2 sm:p-4 lg:p-6 bg-gradient-to-br from-blue-100 to-purple-100 min-h-screen">
+        <div class="bg-white rounded-lg shadow-lg p-3 sm:p-4 lg:p-6 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl">
+            <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-center mb-2 sm:mb-4 text-purple-800">
+                🎮 동물 매칭 게임
+            </h1>
+            
+            <div class="flex justify-between items-center mb-2 sm:mb-4">
+                <div class="text-lg sm:text-xl font-semibold text-blue-600" id="score">
+                    점수: 0
+                </div>
+                <button
+                    onclick="resetGame()"
+                    class="px-3 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                >
+                    새 게임
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-8 gap-0.5 sm:gap-1 bg-gray-300 p-1 sm:p-2 rounded-lg mx-auto" 
+                 id="game-board" style="width: min(100%, 90vw, 500px); aspect-ratio: 1;">
+            </div>
+            
+            <div class="mt-2 sm:mt-4 text-center text-xs sm:text-sm text-gray-600 px-2">
+                <p>💡 인접한 두 동물을 클릭하여 교환하세요!</p>
+                <p class="hidden sm:block">같은 동물 3개 이상을 연결하면 점수를 얻습니다.</p>
+                <p class="sm:hidden">같은 동물 3개 이상 연결로 점수 획득!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const animals = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼'];
+        const BOARD_SIZE = 8;
+        const COLORS = {
+            '🐶': 'bg-yellow-200',
+            '🐱': 'bg-orange-200', 
+            '🐭': 'bg-gray-200',
+            '🐹': 'bg-pink-200',
+            '🐰': 'bg-green-200',
+            '🦊': 'bg-red-200',
+            '🐻': 'bg-amber-200',
+            '🐼': 'bg-slate-200'
+        };
+
+        let board = [];
+        let selectedTiles = [];
+        let score = 0;
+        let isSwapping = false;
+        let matchedTiles = [];
+        let animatingTiles = [];
+
+        // 보드 초기화
+        function initializeBoard() {
+            board = [];
+            for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+                board.push(animals[Math.floor(Math.random() * animals.length)]);
+            }
+            renderBoard();
+        }
+
+        // 보드 렌더링
+        function renderBoard() {
+            const gameBoard = document.getElementById('game-board');
+            gameBoard.innerHTML = '';
+            
+            board.forEach((animal, index) => {
+                const tile = document.createElement('div');
+                tile.className = `
+                    tile aspect-square flex items-center justify-center cursor-pointer
+                    rounded relative overflow-hidden
+                    text-xs sm:text-sm md:text-base lg:text-lg
+                    ${COLORS[animal] || 'bg-white'}
+                    ${selectedTiles.includes(index) ? 'selected' : ''}
+                    ${matchedTiles.includes(index) ? 'matched' : ''}
+                    ${animatingTiles.includes(index) ? 'animating' : ''}
+                `;
+                
+                if (isSwapping) {
+                    tile.style.pointerEvents = 'none';
+                }
+                
+                const span = document.createElement('span');
+                span.className = `effect-span ${matchedTiles.includes(index) ? 'matched' : ''}`;
+                span.textContent = animal;
+                tile.appendChild(span);
+                
+                // 매치 효과 추가
+                if (matchedTiles.includes(index)) {
+                    // 반짝이는 효과
+                    const sparkle = document.createElement('div');
+                    sparkle.className = 'absolute inset-0 bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-400 opacity-75 animate-ping';
+                    tile.appendChild(sparkle);
+                    
+                    // 폭발 효과
+                    const explosion = document.createElement('div');
+                    explosion.className = 'absolute inset-0 flex items-center justify-center';
+                    explosion.innerHTML = `
+                        <div class="w-1 h-1 sm:w-2 sm:h-2 bg-yellow-400 rounded-full animate-ping"></div>
+                        <div class="w-0.5 h-0.5 sm:w-1 sm:h-1 bg-white rounded-full animate-ping absolute top-0.5 sm:top-1 left-0.5 sm:left-1"></div>
+                        <div class="w-0.5 h-0.5 sm:w-1 sm:h-1 bg-white rounded-full animate-ping absolute top-0.5 sm:top-1 right-0.5 sm:right-1"></div>
+                        <div class="w-0.5 h-0.5 sm:w-1 sm:h-1 bg-white rounded-full animate-ping absolute bottom-0.5 sm:bottom-1 left-0.5 sm:left-1"></div>
+                        <div class="w-0.5 h-0.5 sm:w-1 sm:h-1 bg-white rounded-full animate-ping absolute bottom-0.5 sm:bottom-1 right-0.5 sm:right-1"></div>
+                    `;
+                    tile.appendChild(explosion);
+                    
+                    // 점수 표시
+                    const scorePopup = document.createElement('div');
+                    scorePopup.className = 'absolute -top-4 sm:-top-6 left-1/2 transform -translate-x-1/2 text-yellow-500 font-bold text-xs animate-bounce';
+                    scorePopup.textContent = '+10';
+                    tile.appendChild(scorePopup);
+                }
+                
+                tile.addEventListener('click', () => handleTileClick(index));
+                gameBoard.appendChild(tile);
+            });
+        }
+
+        // 매치 찾기
+        function findMatches() {
+            const matches = new Set();
+            
+            // 가로 매치 찾기
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE - 2; col++) {
+                    const index = row * BOARD_SIZE + col;
+                    const animal = board[index];
+                    if (animal && 
+                        board[index + 1] === animal && 
+                        board[index + 2] === animal) {
+                        matches.add(index);
+                        matches.add(index + 1);
+                        matches.add(index + 2);
+                        
+                        // 연속된 매치 확장
+                        let extendCol = col + 3;
+                        while (extendCol < BOARD_SIZE && board[row * BOARD_SIZE + extendCol] === animal) {
+                            matches.add(row * BOARD_SIZE + extendCol);
+                            extendCol++;
+                        }
+                    }
+                }
+            }
+            
+            // 세로 매치 찾기
+            for (let col = 0; col < BOARD_SIZE; col++) {
+                for (let row = 0; row < BOARD_SIZE - 2; row++) {
+                    const index = row * BOARD_SIZE + col;
+                    const animal = board[index];
+                    if (animal && 
+                        board[index + BOARD_SIZE] === animal && 
+                        board[index + BOARD_SIZE * 2] === animal) {
+                        matches.add(index);
+                        matches.add(index + BOARD_SIZE);
+                        matches.add(index + BOARD_SIZE * 2);
+                        
+                        // 연속된 매치 확장
+                        let extendRow = row + 3;
+                        while (extendRow < BOARD_SIZE && board[extendRow * BOARD_SIZE + col] === animal) {
+                            matches.add(extendRow * BOARD_SIZE + col);
+                            extendRow++;
+                        }
+                    }
+                }
+            }
+            
+            return Array.from(matches);
+        }
+
+        // 타일 떨어뜨리기
+        function dropTiles(matchedIndices) {
+            const newBoard = [...board];
+            
+            // 매치된 타일 제거
+            matchedIndices.forEach(index => {
+                newBoard[index] = null;
+            });
+            
+            // 각 열에 대해 타일 떨어뜨리기
+            for (let col = 0; col < BOARD_SIZE; col++) {
+                const column = [];
+                for (let row = BOARD_SIZE - 1; row >= 0; row--) {
+                    const index = row * BOARD_SIZE + col;
+                    if (newBoard[index] !== null) {
+                        column.push(newBoard[index]);
+                    }
+                }
+                
+                // 빈 공간을 새로운 랜덤 동물로 채우기
+                while (column.length < BOARD_SIZE) {
+                    column.push(animals[Math.floor(Math.random() * animals.length)]);
+                }
+                
+                // 열을 다시 보드에 배치
+                for (let row = 0; row < BOARD_SIZE; row++) {
+                    const index = row * BOARD_SIZE + col;
+                    newBoard[index] = column[BOARD_SIZE - 1 - row];
+                }
+            }
+            
+            return newBoard;
+        }
+
+        // 매치 처리
+        function processMatches() {
+            const matches = findMatches();
+            if (matches.length > 0) {
+                // 매치된 타일에 애니메이션 효과 적용
+                matchedTiles = matches;
+                animatingTiles = matches;
+                renderBoard();
+                
+                setTimeout(() => {
+                    score += matches.length * 10;
+                    document.getElementById('score').textContent = `점수: ${score}`;
+                    board = dropTiles(matches);
+                    matchedTiles = [];
+                    animatingTiles = [];
+                    renderBoard();
+                    
+                    // 연쇄 매치를 위해 다시 체크
+                    setTimeout(() => processMatches(), 300);
+                }, 600); // 애니메이션 시간
+            }
+        }
+
+        // 타일 클릭 처리
+        function handleTileClick(index) {
+            if (isSwapping) return;
+            
+            if (selectedTiles.length === 0) {
+                selectedTiles = [index];
+                renderBoard();
+            } else if (selectedTiles.length === 1) {
+                const firstIndex = selectedTiles[0];
+                if (firstIndex === index) {
+                    selectedTiles = [];
+                    renderBoard();
+                    return;
+                }
+                
+                // 인접한 타일인지 확인
+                const firstRow = Math.floor(firstIndex / BOARD_SIZE);
+                const firstCol = firstIndex % BOARD_SIZE;
+                const secondRow = Math.floor(index / BOARD_SIZE);
+                const secondCol = index % BOARD_SIZE;
+                
+                const isAdjacent = 
+                    (Math.abs(firstRow - secondRow) === 1 && firstCol === secondCol) ||
+                    (Math.abs(firstCol - secondCol) === 1 && firstRow === secondRow);
+                
+                if (isAdjacent) {
+                    isSwapping = true;
+                    
+                    // 타일 교환
+                    const newBoard = [...board];
+                    [newBoard[firstIndex], newBoard[index]] = [newBoard[index], newBoard[firstIndex]];
+                    
+                    // 교환 후 매치가 있는지 확인
+                    const originalBoard = [...board];
+                    board = newBoard;
+                    const matches = findMatches();
+                    
+                    if (matches.length > 0) {
+                        renderBoard();
+                        setTimeout(() => {
+                            processMatches();
+                            isSwapping = false;
+                        }, 200);
+                    } else {
+                        // 매치가 없으면 원래대로 되돌리기
+                        board = originalBoard;
+                        setTimeout(() => {
+                            isSwapping = false;
+                            renderBoard();
+                        }, 200);
+                    }
+                }
+                
+                selectedTiles = [];
+            }
+        }
+
+        // 게임 리셋
+        function resetGame() {
+            score = 0;
+            document.getElementById('score').textContent = '점수: 0';
+            selectedTiles = [];
+            isSwapping = false;
+            matchedTiles = [];
+            animatingTiles = [];
+            initializeBoard();
+            
+            // 초기 매치 제거
+            setTimeout(() => {
+                processMatches();
+            }, 500);
+        }
+
+        // 게임 시작
+        window.addEventListener('load', () => {
+            initializeBoard();
+            // 초기 매치 제거
+            setTimeout(() => {
+                processMatches();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
