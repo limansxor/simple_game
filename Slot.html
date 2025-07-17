@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>슬롯머신 게임</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .slot-machine {
+            background: linear-gradient(145deg, #2c3e50, #34495e);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            text-align: center;
+            border: 5px solid #f1c40f;
+        }
+
+        .title {
+            color: #f1c40f;
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .reels-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 30px 0;
+            background: #1a252f;
+            padding: 20px;
+            border-radius: 15px;
+            border: 3px solid #34495e;
+        }
+
+        .reel {
+            width: 100px;
+            height: 120px;
+            background: linear-gradient(145deg, #ecf0f1, #bdc3c7);
+            border: 3px solid #34495e;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4em;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .reel {
+            width: 100px;
+            height: 120px;
+            background: linear-gradient(145deg, #ecf0f1, #bdc3c7);
+            border: 3px solid #34495e;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .reel-content {
+            position: absolute;
+            width: 100px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s ease;
+            top: 0;
+            left: 0;
+        }
+
+        .reel.spinning .reel-content {
+            animation: slotDrop 3s ease-out;
+        }
+
+        .symbol-item {
+            height: 120px;
+            width: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1em;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+
+        @keyframes slotDrop {
+            0% {
+                transform: translateY(-3000px);
+            }
+            100% {
+                transform: translateY(0);
+            }
+        }
+
+        .controls {
+            margin: 30px 0;
+        }
+
+        .spin-btn {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+            transition: all 0.3s ease;
+            margin: 0 10px;
+        }
+
+        .spin-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(231, 76, 60, 0.6);
+        }
+
+        .spin-btn:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            background: #1a252f;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #34495e;
+        }
+
+        .info-item {
+            text-align: center;
+            color: #ecf0f1;
+        }
+
+        .info-label {
+            font-size: 0.9em;
+            color: #bdc3c7;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #f1c40f;
+        }
+
+        .message {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1.2em;
+            min-height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .win {
+            background: linear-gradient(145deg, #27ae60, #2ecc71);
+            color: white;
+            animation: glow 1s ease-in-out infinite alternate;
+        }
+
+        .lose {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+            color: white;
+        }
+
+        .jackpot {
+            background: linear-gradient(145deg, #f1c40f, #f39c12);
+            color: #2c3e50;
+            animation: jackpot-glow 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 20px rgba(46, 204, 113, 0.5); }
+            to { box-shadow: 0 0 30px rgba(46, 204, 113, 0.8); }
+        }
+
+        @keyframes jackpot-glow {
+            from { 
+                box-shadow: 0 0 30px rgba(241, 196, 15, 0.8);
+                transform: scale(1);
+            }
+            to { 
+                box-shadow: 0 0 50px rgba(241, 196, 15, 1);
+                transform: scale(1.05);
+            }
+        }
+
+        .payouts {
+            background: #1a252f;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 2px solid #34495e;
+        }
+
+        .payouts h3 {
+            color: #f1c40f;
+            margin-bottom: 10px;
+        }
+
+        .payout-line {
+            color: #ecf0f1;
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="slot-machine">
+        <div class="title">🎰 슬롯머신 🎰</div>
+        
+        <div class="info-panel">
+            <div class="info-item">
+                <div class="info-label">코인</div>
+                <div class="info-value" id="coins">100</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">베팅</div>
+                <div class="info-value" id="bet">10</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">승리</div>
+                <div class="info-value" id="wins">0</div>
+            </div>
+        </div>
+
+        <div class="reels-container">
+            <div class="reel" id="reel1">
+                <div class="reel-content">
+                    <div class="symbol-item">🍒</div>
+                </div>
+            </div>
+            <div class="reel" id="reel2">
+                <div class="reel-content">
+                    <div class="symbol-item">🍋</div>
+                </div>
+            </div>
+            <div class="reel" id="reel3">
+                <div class="reel-content">
+                    <div class="symbol-item">🔔</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="spin-btn" onclick="adjustBet(-5)">베팅 -</button>
+            <button class="spin-btn" id="spinBtn" onclick="spin()">스핀!</button>
+            <button class="spin-btn" onclick="adjustBet(5)">베팅 +</button>
+        </div>
+
+        <div class="message" id="message">행운을 빕니다!</div>
+
+        <div class="payouts">
+            <h3>💰 당첨표 💰</h3>
+            <div class="payout-line">🍒🍒🍒 = 베팅 × 5</div>
+            <div class="payout-line">🍋🍋🍋 = 베팅 × 10</div>
+            <div class="payout-line">🔔🔔🔔 = 베팅 × 15</div>
+            <div class="payout-line">🍇🍇🍇 = 베팅 × 20</div>
+            <div class="payout-line">⭐⭐⭐ = 베팅 × 30</div>
+            <div class="payout-line">💎💎💎 = 잭팟! (베팅 × 100)</div>
+            <div class="payout-line">같은 두 개 = 베팅 × 2</div>
+        </div>
+    </div>
+
+    <script>
+        let gameState = {
+            coins: 100,
+            bet: 10,
+            wins: 0,
+            spinning: false
+        };
+
+        const symbols = ['🍒', '🍋', '🔔', '🍇', '⭐', '💎'];
+        const payouts = {
+            '🍒🍒🍒': 5,
+            '🍋🍋🍋': 10,
+            '🔔🔔🔔': 15,
+            '🍇🍇🍇': 20,
+            '⭐⭐⭐': 30,
+            '💎💎💎': 100
+        };
+
+        function updateDisplay() {
+            document.getElementById('coins').textContent = gameState.coins;
+            document.getElementById('bet').textContent = gameState.bet;
+            document.getElementById('wins').textContent = gameState.wins;
+            
+            document.getElementById('spinBtn').disabled = gameState.spinning || gameState.coins < gameState.bet;
+        }
+
+        function adjustBet(amount) {
+            if (gameState.spinning) return;
+            
+            const newBet = gameState.bet + amount;
+            if (newBet >= 5 && newBet <= gameState.coins && newBet <= 50) {
+                gameState.bet = newBet;
+                updateDisplay();
+            }
+        }
+
+        function getRandomSymbol() {
+            return symbols[Math.floor(Math.random() * symbols.length)];
+        }
+
+        function spin() {
+            if (gameState.spinning || gameState.coins < gameState.bet) return;
+            
+            gameState.spinning = true;
+            gameState.coins -= gameState.bet;
+            updateDisplay();
+
+            // 메시지 업데이트
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = '돌아가는 중...';
+            messageEl.className = 'message';
+
+            // 릴 회전 애니메이션
+            const reels = ['reel1', 'reel2', 'reel3'];
+            const results = [getRandomSymbol(), getRandomSymbol(), getRandomSymbol()];
+            
+            reels.forEach((reelId, index) => {
+                const reelEl = document.getElementById(reelId);
+                const reelContent = reelEl.querySelector('.reel-content');
+                
+                // 스핀 중에 여러 심볼들을 세로로 배치하여 내려오는 효과
+                let symbolString = '';
+                // 25개의 랜덤 심볼들을 위에 배치
+                for (let i = 0; i < 55; i++) {
+                    symbolString += '<div class="symbol-item">' + 
+                                   symbols[Math.floor(Math.random() * symbols.length)] + '</div>';
+                }
+                // 마지막에 최종 결과 심볼 추가
+                symbolString += '<div class="symbol-item">' + results[index] + '</div>';
+                
+                reelContent.innerHTML = symbolString;
+                
+                // 스핀 애니메이션 시작
+                reelEl.classList.add('spinning');
+                
+                // 각 릴이 다른 시간에 정지하도록 설정
+                setTimeout(() => {
+                    reelEl.classList.remove('spinning');
+                    reelContent.innerHTML = '<div class="symbol-item">' + results[index] + '</div>';
+                    
+                    // 마지막 릴이 정지했을 때 결과 확인
+                    if (index === 2) {
+                        setTimeout(() => {
+                            checkWin(results);
+                            gameState.spinning = false;
+                            updateDisplay();
+
+                            // 게임 오버 체크
+                            if (gameState.coins < 5) {
+                                setTimeout(() => {
+                                    if (confirm('코인이 부족합니다! 새 게임을 시작하시겠습니까?')) {
+                                        resetGame();
+                                    }
+                                }, 1000);
+                            }
+                        }, 200);
+                    }
+                }, 1800 + (index * 300)); // 각 릴이 0.3초씩 차이나게 정지
+            });
+        }
+
+        function checkWin(results) {
+            const combination = results.join('');
+            const messageEl = document.getElementById('message');
+            
+            // 3개 일치 체크
+            if (payouts[combination]) {
+                const winAmount = gameState.bet * payouts[combination];
+                gameState.coins += winAmount;
+                gameState.wins++;
+                
+                if (combination === '💎💎💎') {
+                    messageEl.textContent = `🎉 잭팟! +${winAmount} 코인! 🎉`;
+                    messageEl.className = 'message jackpot';
+                } else {
+                    messageEl.textContent = `🎉 승리! +${winAmount} 코인! 🎉`;
+                    messageEl.className = 'message win';
+                }
+                return;
+            }
+            
+            // 2개 일치 체크
+            const uniqueSymbols = [...new Set(results)];
+            if (uniqueSymbols.length === 2) {
+                const winAmount = gameState.bet * 2;
+                gameState.coins += winAmount;
+                gameState.wins++;
+                messageEl.textContent = `👍 두 개 일치! +${winAmount} 코인!`;
+                messageEl.className = 'message win';
+                return;
+            }
+            
+            // 패배
+            messageEl.textContent = '다음 기회에...';
+            messageEl.className = 'message lose';
+        }
+
+        function resetGame() {
+            gameState = {
+                coins: 100,
+                bet: 10,
+                wins: 0,
+                spinning: false
+            };
+            
+            document.getElementById('reel1').querySelector('.reel-content').innerHTML = '<div class="symbol-item">🍒</div>';
+            document.getElementById('reel2').querySelector('.reel-content').innerHTML = '<div class="symbol-item">🍋</div>';
+            document.getElementById('reel3').querySelector('.reel-content').innerHTML = '<div class="symbol-item">🔔</div>';
+            
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = '행운을 빕니다!';
+            messageEl.className = 'message';
+            
+            updateDisplay();
+        }
+
+        // 초기 화면 설정
+        updateDisplay();
+    </script>
+</body>
+</html>

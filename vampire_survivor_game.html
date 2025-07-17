@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이모지 뱀파이어 서바이벌</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        #gameCanvas {
+            border: 3px solid #ff6b6b;
+            background: #0f0f23;
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+        }
+        
+        .ui {
+            display: flex;
+            gap: 20px;
+            margin: 10px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .controls {
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        button {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #ff5252;
+        }
+        
+        .game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧛 이모지 뱀파이어 서바이벌 🧛</h1>
+    
+    <div class="ui">
+        <div>❤️ HP: <span id="hp">100</span></div>
+        <div>⭐ 레벨: <span id="level">1</span></div>
+        <div>💀 처치: <span id="kills">0</span></div>
+        <div>⏰ 시간: <span id="time">0</span>s</div>
+        <div>🎯 난이도: <span id="difficulty">1</span>/8</div>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div class="controls">
+        <p>🖱️ 마우스로 이동 (WASD/방향키도 가능)</p>
+        <button onclick="startGame()">🎮 게임 시작</button>
+        <button onclick="pauseGame()">⏸️ 일시정지</button>
+    </div>
+    
+    <div id="gameOver" class="game-over">
+        <h2>💀 게임 오버 💀</h2>
+        <p>생존 시간: <span id="finalTime">0</span>초</p>
+        <p>처치한 적: <span id="finalKills">0</span>마리</p>
+        <p>도달 난이도: <span id="finalDifficulty">1</span></p>
+        <button onclick="restartGame()">🔄 다시 시작</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameState = {
+            player: { x: 400, y: 300, hp: 100, maxHp: 100 },
+            enemies: [],
+            bullets: [],
+            powerUps: [],
+            level: 1,
+            kills: 0,
+            time: 0,
+            difficulty: 1,
+            gameRunning: false,
+            paused: false
+        };
+        
+        let keys = {};
+        let lastTime = 0;
+        let spawnTimer = 0;
+        let shootTimer = 0;
+        let difficultyTimer = 0;
+        
+        // 이모지 설정
+        const emojis = {
+            player: '🧙‍♂️',
+            enemies: ['👻', '💀', '🕷️', '🦇', '👹', '🐺', '🧟‍♂️', '👿'],
+            bullet: '✨',
+            powerUp: '💎',
+            heart: '❤️'
+        };
+        
+        // 난이도별 설정 (몬스터 수 10배 증가)
+        const difficultySettings = [
+            { enemySpeed: 0.5, spawnRate: 200, enemyHp: 1, enemyDamage: 10 },
+            { enemySpeed: 0.7, spawnRate: 180, enemyHp: 1, enemyDamage: 12 },
+            { enemySpeed: 0.9, spawnRate: 160, enemyHp: 2, enemyDamage: 15 },
+            { enemySpeed: 1.1, spawnRate: 140, enemyHp: 2, enemyDamage: 18 },
+            { enemySpeed: 1.3, spawnRate: 120, enemyHp: 3, enemyDamage: 20 },
+            { enemySpeed: 1.5, spawnRate: 100, enemyHp: 3, enemyDamage: 25 },
+            { enemySpeed: 1.7, spawnRate: 80, enemyHp: 4, enemyDamage: 30 },
+            { enemySpeed: 2.0, spawnRate: 60, enemyHp: 5, enemyDamage: 35 }
+        ];
+        
+        // 마우스 이벤트
+        let mouseX = 400;
+        let mouseY = 300;
+        
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+        });
+        
+        // 키보드 이벤트 (백업용)
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+        
+        function drawEmoji(emoji, x, y, size = 30) {
+            ctx.font = `${size}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillText(emoji, x, y + size/3);
+        }
+        
+        function spawnEnemy() {
+            const side = Math.floor(Math.random() * 4);
+            let x, y;
+            
+            switch(side) {
+                case 0: x = Math.random() * canvas.width; y = -30; break;
+                case 1: x = canvas.width + 30; y = Math.random() * canvas.height; break;
+                case 2: x = Math.random() * canvas.width; y = canvas.height + 30; break;
+                case 3: x = -30; y = Math.random() * canvas.height; break;
+            }
+            
+            const settings = difficultySettings[gameState.difficulty - 1];
+            const enemyType = Math.min(gameState.difficulty - 1, emojis.enemies.length - 1);
+            
+            gameState.enemies.push({
+                x: x,
+                y: y,
+                hp: settings.enemyHp,
+                maxHp: settings.enemyHp,
+                damage: settings.enemyDamage,
+                speed: settings.enemySpeed,
+                emoji: emojis.enemies[enemyType]
+            });
+        }
+        
+        function shootBullet() {
+            if (gameState.enemies.length === 0) return;
+            
+            // 가장 가까운 적 찾기
+            let closestEnemy = null;
+            let closestDistance = Infinity;
+            
+            gameState.enemies.forEach(enemy => {
+                const distance = Math.sqrt(
+                    Math.pow(enemy.x - gameState.player.x, 2) + 
+                    Math.pow(enemy.y - gameState.player.y, 2)
+                );
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestEnemy = enemy;
+                }
+            });
+            
+            if (closestEnemy) {
+                const angle = Math.atan2(
+                    closestEnemy.y - gameState.player.y,
+                    closestEnemy.x - gameState.player.x
+                );
+                
+                gameState.bullets.push({
+                    x: gameState.player.x,
+                    y: gameState.player.y,
+                    vx: Math.cos(angle) * 5,
+                    vy: Math.sin(angle) * 5,
+                    damage: gameState.level
+                });
+            }
+        }
+        
+        function updateGame(deltaTime) {
+            if (!gameState.gameRunning || gameState.paused) return;
+            
+            // 시간 업데이트
+            gameState.time += deltaTime / 1000;
+            
+            // 난이도 증가 (30초마다)
+            difficultyTimer += deltaTime;
+            if (difficultyTimer >= 30000 && gameState.difficulty < 8) {
+                gameState.difficulty++;
+                difficultyTimer = 0;
+            }
+            
+            // 플레이어 이동 (마우스 추적)
+            const dx = mouseX - gameState.player.x;
+            const dy = mouseY - gameState.player.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > 5) { // 마우스에 너무 가까우면 움직이지 않음
+                const speed = 3;
+                const moveX = (dx / distance) * speed;
+                const moveY = (dy / distance) * speed;
+                
+                gameState.player.x = Math.max(15, Math.min(canvas.width - 15, gameState.player.x + moveX));
+                gameState.player.y = Math.max(15, Math.min(canvas.height - 15, gameState.player.y + moveY));
+            }
+            
+            // 키보드 이동 (백업)
+            const keySpeed = 3;
+            if (keys['w'] || keys['arrowup']) gameState.player.y = Math.max(15, gameState.player.y - keySpeed);
+            if (keys['s'] || keys['arrowdown']) gameState.player.y = Math.min(canvas.height - 15, gameState.player.y + keySpeed);
+            if (keys['a'] || keys['arrowleft']) gameState.player.x = Math.max(15, gameState.player.x - keySpeed);
+            if (keys['d'] || keys['arrowright']) gameState.player.x = Math.min(canvas.width - 15, gameState.player.x + keySpeed);
+            
+            // 적 생성
+            const settings = difficultySettings[gameState.difficulty - 1];
+            spawnTimer += deltaTime;
+            if (spawnTimer >= settings.spawnRate) {
+                spawnEnemy();
+                spawnTimer = 0;
+            }
+            
+            // 총알 발사
+            shootTimer += deltaTime;
+            if (shootTimer >= 300) {
+                shootBullet();
+                shootTimer = 0;
+            }
+            
+            // 적 업데이트
+            gameState.enemies.forEach((enemy, enemyIndex) => {
+                const angle = Math.atan2(
+                    gameState.player.y - enemy.y,
+                    gameState.player.x - enemy.x
+                );
+                enemy.x += Math.cos(angle) * enemy.speed;
+                enemy.y += Math.sin(angle) * enemy.speed;
+                
+                // 플레이어와 충돌 체크
+                const distance = Math.sqrt(
+                    Math.pow(enemy.x - gameState.player.x, 2) + 
+                    Math.pow(enemy.y - gameState.player.y, 2)
+                );
+                
+                if (distance < 25) {
+                    gameState.player.hp -= enemy.damage;
+                    gameState.enemies.splice(enemyIndex, 1);
+                    
+                    if (gameState.player.hp <= 0) {
+                        endGame();
+                    }
+                }
+            });
+            
+            // 총알 업데이트
+            gameState.bullets.forEach((bullet, bulletIndex) => {
+                bullet.x += bullet.vx;
+                bullet.y += bullet.vy;
+                
+                // 화면 밖으로 나간 총알 제거
+                if (bullet.x < 0 || bullet.x > canvas.width || 
+                    bullet.y < 0 || bullet.y > canvas.height) {
+                    gameState.bullets.splice(bulletIndex, 1);
+                    return;
+                }
+                
+                // 적과 충돌 체크
+                gameState.enemies.forEach((enemy, enemyIndex) => {
+                    const distance = Math.sqrt(
+                        Math.pow(enemy.x - bullet.x, 2) + 
+                        Math.pow(enemy.y - bullet.y, 2)
+                    );
+                    
+                    if (distance < 20) {
+                        enemy.hp -= bullet.damage;
+                        gameState.bullets.splice(bulletIndex, 1);
+                        
+                        if (enemy.hp <= 0) {
+                            gameState.enemies.splice(enemyIndex, 1);
+                            gameState.kills++;
+                            
+                            // 레벨업 (10킬마다)
+                            if (gameState.kills % 10 === 0) {
+                                gameState.level++;
+                                gameState.player.maxHp += 10;
+                                gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + 20);
+                            }
+                        }
+                    }
+                });
+            });
+            
+            updateUI();
+        }
+        
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 플레이어 그리기
+            drawEmoji(emojis.player, gameState.player.x, gameState.player.y, 35);
+            
+            // HP 바 그리기
+            const hpBarWidth = 60;
+            const hpBarHeight = 8;
+            const hpPercent = gameState.player.hp / gameState.player.maxHp;
+            
+            ctx.fillStyle = '#ff4444';
+            ctx.fillRect(gameState.player.x - hpBarWidth/2, gameState.player.y - 35, hpBarWidth, hpBarHeight);
+            ctx.fillStyle = '#44ff44';
+            ctx.fillRect(gameState.player.x - hpBarWidth/2, gameState.player.y - 35, hpBarWidth * hpPercent, hpBarHeight);
+            
+            // 적 그리기
+            gameState.enemies.forEach(enemy => {
+                drawEmoji(enemy.emoji, enemy.x, enemy.y, 25);
+                
+                // 적 HP 바
+                if (enemy.hp < enemy.maxHp) {
+                    const enemyHpBarWidth = 30;
+                    const enemyHpBarHeight = 4;
+                    const enemyHpPercent = enemy.hp / enemy.maxHp;
+                    
+                    ctx.fillStyle = '#ff4444';
+                    ctx.fillRect(enemy.x - enemyHpBarWidth/2, enemy.y - 25, enemyHpBarWidth, enemyHpBarHeight);
+                    ctx.fillStyle = '#44ff44';
+                    ctx.fillRect(enemy.x - enemyHpBarWidth/2, enemy.y - 25, enemyHpBarWidth * enemyHpPercent, enemyHpBarHeight);
+                }
+            });
+            
+            // 총알 그리기
+            gameState.bullets.forEach(bullet => {
+                drawEmoji(emojis.bullet, bullet.x, bullet.y, 15);
+            });
+            
+            if (gameState.paused) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                ctx.font = '40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('⏸️ 일시정지', canvas.width/2, canvas.height/2);
+            }
+        }
+        
+        function updateUI() {
+            document.getElementById('hp').textContent = Math.max(0, Math.floor(gameState.player.hp));
+            document.getElementById('level').textContent = gameState.level;
+            document.getElementById('kills').textContent = gameState.kills;
+            document.getElementById('time').textContent = Math.floor(gameState.time);
+            document.getElementById('difficulty').textContent = gameState.difficulty;
+        }
+        
+        function gameLoop(currentTime) {
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            updateGame(deltaTime);
+            render();
+            
+            if (gameState.gameRunning) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        function startGame() {
+            gameState = {
+                player: { x: 400, y: 300, hp: 100, maxHp: 100 },
+                enemies: [],
+                bullets: [],
+                powerUps: [],
+                level: 1,
+                kills: 0,
+                time: 0,
+                difficulty: 1,
+                gameRunning: true,
+                paused: false
+            };
+            
+            spawnTimer = 0;
+            shootTimer = 0;
+            difficultyTimer = 0;
+            
+            document.getElementById('gameOver').style.display = 'none';
+            updateUI();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function pauseGame() {
+            if (gameState.gameRunning) {
+                gameState.paused = !gameState.paused;
+            }
+        }
+        
+        function endGame() {
+            gameState.gameRunning = false;
+            document.getElementById('finalTime').textContent = Math.floor(gameState.time);
+            document.getElementById('finalKills').textContent = gameState.kills;
+            document.getElementById('finalDifficulty').textContent = gameState.difficulty;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+        
+        function restartGame() {
+            startGame();
+        }
+        
+        // 초기 렌더링
+        render();
+    </script>
+</body>
+</html>
