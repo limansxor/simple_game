@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>실시간 주식 뉴스 대시보드</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: #0a0e1a;
+    color: #e0e6f0;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── 상단 헤더 ── */
+  .header {
+    background: linear-gradient(135deg, #0f1629 0%, #1a1f3a 100%);
+    border-bottom: 1px solid rgba(99, 179, 237, 0.15);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+
+  .header-left { display: flex; align-items: center; gap: 14px; }
+
+  .logo {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 900; color: #fff;
+  }
+
+  .header h1 {
+    font-size: 20px; font-weight: 700;
+    background: linear-gradient(90deg, #38bdf8, #818cf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  .status-bar { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #94a3b8; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .countdown {
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-variant-numeric: tabular-nums;
+    color: #38bdf8;
+    font-weight: 500;
+  }
+
+  /* ── 섹터 탭 ── */
+  .sector-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 16px 32px;
+    overflow-x: auto;
+    background: rgba(15, 22, 41, 0.6);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .sector-tab {
+    padding: 8px 18px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: all 0.25s;
+    color: #94a3b8;
+  }
+
+  .sector-tab:hover { background: rgba(56, 189, 248, 0.1); color: #e0e6f0; }
+  .sector-tab.active {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(129, 140, 248, 0.2));
+    border-color: rgba(56, 189, 248, 0.4);
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .sector-tab .count {
+    display: inline-block;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 11px;
+    margin-left: 6px;
+  }
+
+  .sector-tab.active .count {
+    background: rgba(56, 189, 248, 0.3);
+  }
+
+  /* ── 최신 헤드라인 (히어로) ── */
+  .hero-section {
+    padding: 32px;
+    position: relative;
+  }
+
+  .hero-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #f87171;
+    margin-bottom: 16px;
+  }
+
+  .hero-label .blink {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #f87171;
+    animation: pulse 1s infinite;
+  }
+
+  .hero-card {
+    background: linear-gradient(135deg, rgba(30, 41, 75, 0.8), rgba(20, 25, 50, 0.9));
+    border: 1px solid rgba(99, 179, 237, 0.15);
+    border-radius: 16px;
+    padding: 32px 36px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.5s;
+    cursor: pointer;
+  }
+
+  .hero-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #38bdf8, #818cf8, #f472b6);
+  }
+
+  .hero-card:hover {
+    border-color: rgba(56, 189, 248, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(56, 189, 248, 0.1);
+  }
+
+  .hero-sector-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  .hero-title {
+    font-size: 28px;
+    font-weight: 900;
+    line-height: 1.4;
+    color: #fff;
+    margin-bottom: 12px;
+    animation: fadeSlideIn 0.6s ease;
+  }
+
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 13px;
+    color: #64748b;
+  }
+
+  .hero-meta span { display: flex; align-items: center; gap: 4px; }
+
+  /* ── 섹터별 최신 카드들 ── */
+  .sector-highlights {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    padding: 0 32px 24px;
+  }
+
+  .sector-card {
+    background: rgba(20, 28, 55, 0.6);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+
+  .sector-card:hover {
+    border-color: rgba(56, 189, 248, 0.2);
+    background: rgba(25, 35, 65, 0.8);
+    transform: translateY(-1px);
+  }
+
+  .sector-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .sector-card-badge {
+    padding: 3px 10px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .sector-card-time { font-size: 11px; color: #64748b; }
+
+  .sector-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.5;
+    color: #cbd5e1;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .sector-card:hover .sector-card-title { color: #fff; }
+
+  /* ── 뉴스 로그 ── */
+  .log-section {
+    padding: 0 32px 32px;
+  }
+
+  .log-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .log-header h2 {
+    font-size: 16px; font-weight: 700; color: #94a3b8;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .log-total {
+    font-size: 12px; color: #64748b;
+    background: rgba(255,255,255,0.05);
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+
+  .log-list { display: flex; flex-direction: column; gap: 4px; }
+
+  .log-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    transition: background 0.2s;
+    cursor: pointer;
+    animation: logFadeIn 0.4s ease;
+  }
+
+  @keyframes logFadeIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .log-item:hover { background: rgba(255,255,255,0.05); }
+
+  .log-item-time {
+    font-size: 11px;
+    color: #475569;
+    min-width: 55px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .log-item-sector {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    min-width: 56px;
+    text-align: center;
+  }
+
+  .log-item-title {
+    font-size: 13px;
+    color: #94a3b8;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .log-item:hover .log-item-title { color: #e0e6f0; }
+
+  .log-item-new {
+    background: rgba(56, 189, 248, 0.05);
+    border-left: 2px solid #38bdf8;
+  }
+
+  /* ── 섹터 컬러 ── */
+  .s-tech { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+  .s-finance { background: rgba(250, 204, 21, 0.15); color: #facc15; }
+  .s-bio { background: rgba(52, 211, 153, 0.15); color: #34d399; }
+  .s-energy { background: rgba(251, 146, 60, 0.15); color: #fb923c; }
+  .s-industry { background: rgba(167, 139, 250, 0.15); color: #a78bfa; }
+  .s-consumer { background: rgba(244, 114, 182, 0.15); color: #f472b6; }
+  .s-crypto { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+  .s-general { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+
+  /* ── 로딩 & 빈 상태 ── */
+  .loading-state {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 80px 0;
+    color: #64748b;
+  }
+
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(56, 189, 248, 0.1);
+    border-top-color: #38bdf8;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-hero {
+    text-align: center;
+    padding: 60px;
+    color: #475569;
+    font-size: 15px;
+  }
+
+  /* ── 반응형 ── */
+  @media (max-width: 768px) {
+    .header { padding: 12px 16px; }
+    .sector-tabs { padding: 12px 16px; }
+    .hero-section { padding: 20px 16px; }
+    .hero-title { font-size: 20px; }
+    .sector-highlights { padding: 0 16px 16px; grid-template-columns: 1fr; }
+    .log-section { padding: 0 16px 24px; }
+  }
+
+  /* ── 스크롤바 ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">S</div>
+    <h1>실시간 주식 뉴스 대시보드</h1>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span id="lastUpdate">수집 대기 중...</span>
+    <div class="countdown" id="countdown">3:00</div>
+  </div>
+</div>
+
+<!-- 섹터 탭 -->
+<div class="sector-tabs" id="sectorTabs"></div>
+
+<!-- 히어로(최신 헤드라인) -->
+<div class="hero-section" id="heroSection">
+  <div class="empty-hero">
+    <div class="spinner"></div>
+    <p>뉴스를 수집하는 중입니다...</p>
+  </div>
+</div>
+
+<!-- 섹터별 최신 카드 -->
+<div class="sector-highlights" id="sectorHighlights"></div>
+
+<!-- 로그 -->
+<div class="log-section">
+  <div class="log-header">
+    <h2>📋 수집 로그</h2>
+    <span class="log-total" id="logTotal">총 0건</span>
+  </div>
+  <div class="log-list" id="logList">
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>첫 번째 수집을 기다리고 있습니다...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 섹터 정의 ──
+const SECTORS = {
+  all:      { label: '전체',     cls: 's-general',  icon: '📊' },
+  tech:     { label: 'IT/기술',  cls: 's-tech',     icon: '💻', keywords: ['삼성전자','SK하이닉스','네이버','카카오','반도체','AI','인공지능','테크','tech','apple','nvidia','microsoft','google','meta','TSMC','엔비디아','애플','마이크로소프트','구글','IT','소프트웨어','클라우드','데이터센터','GPU','칩','CPU'] },
+  finance:  { label: '금융',     cls: 's-finance',  icon: '🏦', keywords: ['은행','증권','보험','금리','KB','신한','하나','우리','기준금리','연준','Fed','금융','대출','예금','채권','국채','환율','달러','원화','외환','펀드','자산운용'] },
+  bio:      { label: '바이오/헬스', cls: 's-bio',   icon: '🧬', keywords: ['바이오','제약','의료','셀트리온','삼성바이오','헬스케어','신약','임상','FDA','의약품','백신','치료제','진단','병원','건강'] },
+  energy:   { label: '에너지',   cls: 's-energy',   icon: '⚡', keywords: ['에너지','석유','원유','가스','태양광','풍력','배터리','2차전지','LG에너지','수소','전기차','EV','충전','신재생','친환경','탄소'] },
+  industry: { label: '산업재',   cls: 's-industry', icon: '🏭', keywords: ['현대차','기아','조선','건설','철강','포스코','현대중공업','자동차','HD한국조선','산업','제조','공장','생산','수출','무역'] },
+  consumer: { label: '소비재',   cls: 's-consumer', icon: '🛒', keywords: ['소비','유통','식품','의류','화장품','아모레','LG생활','CJ','롯데','쿠팡','이마트','패션','뷰티','F&B','음식','브랜드'] },
+  crypto:   { label: '가상자산', cls: 's-crypto',   icon: '₿', keywords: ['비트코인','이더리움','코인','가상자산','암호화폐','업비트','빗썸','블록체인','토큰','NFT','디파이','크립토','bitcoin','ethereum','crypto'] }
+};
+
+// ── 상태 ──
+let allNews = [];           // { id, title, sector, time, link, source, isNew }
+let seenTitles = new Set();
+let activeSector = 'all';
+const INTERVAL_SEC = 180;   // 3분 간격 (하루 ~2,880 요청 → 무료 한도 10,000 이내)
+let countdownSec = INTERVAL_SEC;
+let fetchRound = 0;
+
+// ── RSS 피드 소스 (rss2json.com 경유) ──
+const RSS_BASE = 'https://api.rss2json.com/v1/api.json?rss_url=';
+// 피드 6개 (3분 × 6 = 하루 ~2,880 요청, 무료 한도 대비 여유)
+const FEEDS = [
+  { url: 'https://news.google.com/rss/search?q=%EC%A3%BC%EC%8B%9D+%EC%8B%9C%EC%9E%A5+%EC%A6%9D%EC%8B%9C&hl=ko&gl=KR&ceid=KR:ko', tag: '증시종합' },
+  { url: 'https://news.google.com/rss/search?q=%EB%B0%98%EB%8F%84%EC%B2%B4+AI+%EC%A3%BC%EC%8B%9D&hl=ko&gl=KR&ceid=KR:ko', tag: 'IT/반도체' },
+  { url: 'https://news.google.com/rss/search?q=%EB%B0%94%EC%9D%B4%EC%98%A4+%EC%A0%9C%EC%95%BD+%EC%A3%BC%EC%8B%9D&hl=ko&gl=KR&ceid=KR:ko', tag: '바이오' },
+  { url: 'https://news.google.com/rss/search?q=%EC%97%90%EB%84%88%EC%A7%80+%EB%B0%B0%ED%84%B0%EB%A6%AC+%EA%B8%88%EC%9C%B5+%ED%99%98%EC%9C%A8&hl=ko&gl=KR&ceid=KR:ko', tag: '에너지/금융' },
+  { url: 'https://news.google.com/rss/search?q=%EB%B9%84%ED%8A%B8%EC%BD%94%EC%9D%B8+%EA%B0%80%EC%83%81%EC%9E%90%EC%82%B0&hl=ko&gl=KR&ceid=KR:ko', tag: '가상자산' },
+  { url: 'https://news.google.com/rss/search?q=stock+market+today&hl=en&gl=US&ceid=US:en', tag: '글로벌' },
+];
+
+// ── 섹터 분류 ──
+function classifySector(title) {
+  const t = title.toLowerCase();
+  for (const [key, sec] of Object.entries(SECTORS)) {
+    if (key === 'all') continue;
+    if (sec.keywords && sec.keywords.some(kw => t.includes(kw.toLowerCase()))) return key;
+  }
+  return 'general';
+}
+
+function sectorInfo(key) {
+  return SECTORS[key] || SECTORS.all;
+}
+
+// ── 데이터 fetch ──
+async function fetchAllFeeds() {
+  const results = [];
+  const promises = FEEDS.map(async (feed) => {
+    try {
+      const resp = await fetch(RSS_BASE + encodeURIComponent(feed.url));
+      const data = await resp.json();
+      if (data.status === 'ok' && data.items) {
+        data.items.forEach(item => {
+          const title = item.title?.replace(/ - .*$/, '').trim();
+          if (title && !seenTitles.has(title)) {
+            seenTitles.add(title);
+            results.push({
+              id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+              title,
+              sector: classifySector(title),
+              time: new Date(item.pubDate || Date.now()),
+              link: item.link || '#',
+              source: item.author || feed.tag,
+              isNew: true
+            });
+          }
+        });
+      }
+    } catch (e) {
+      console.warn(`Feed error (${feed.tag}):`, e.message);
+    }
+  });
+
+  await Promise.allSettled(promises);
+  return results;
+}
+
+// ── 뉴스 수집 ──
+async function collectNews() {
+  fetchRound++;
+  // 기존 뉴스 isNew 초기화
+  allNews.forEach(n => n.isNew = false);
+
+  const fresh = await fetchAllFeeds();
+  fresh.sort((a, b) => b.time - a.time);
+
+  allNews = [...fresh, ...allNews];
+
+  const now = new Date();
+  document.getElementById('lastUpdate').textContent =
+    `마지막 수집: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')} (${fetchRound}회차 · ${fresh.length}건 신규)`;
+
+  renderAll();
+  countdownSec = INTERVAL_SEC;
+}
+
+// ── 필터링 ──
+function filtered() {
+  if (activeSector === 'all') return allNews;
+  return allNews.filter(n => n.sector === activeSector);
+}
+
+// ── 렌더링 ──
+function renderAll() {
+  renderTabs();
+  renderHero();
+  renderSectorHighlights();
+  renderLog();
+}
+
+function renderTabs() {
+  const el = document.getElementById('sectorTabs');
+  const counts = { all: allNews.length };
+  allNews.forEach(n => { counts[n.sector] = (counts[n.sector] || 0) + 1; });
+
+  el.innerHTML = Object.entries(SECTORS).map(([key, sec]) => {
+    const cnt = counts[key] || 0;
+    return `<div class="sector-tab ${activeSector === key ? 'active' : ''}" onclick="switchSector('${key}')">
+      ${sec.icon} ${sec.label}<span class="count">${cnt}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderHero() {
+  const el = document.getElementById('heroSection');
+  const list = filtered();
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-hero"><div class="spinner"></div><p>뉴스를 수집하는 중입니다...</p></div>';
+    return;
+  }
+  const latest = list[0];
+  const sec = sectorInfo(latest.sector);
+  const t = latest.time;
+  const timeStr = `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`;
+
+  el.innerHTML = `
+    <div class="hero-label"><div class="blink"></div> 최신 헤드라인</div>
+    <div class="hero-card" onclick="window.open('${latest.link}','_blank')">
+      <span class="hero-sector-badge ${sec.cls}">${sec.icon} ${sec.label}</span>
+      <div class="hero-title">${latest.title}</div>
+      <div class="hero-meta">
+        <span>🕐 ${timeStr}</span>
+        <span>📰 ${latest.source}</span>
+        ${latest.isNew ? '<span style="color:#38bdf8;font-weight:600">✨ NEW</span>' : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderSectorHighlights() {
+  const el = document.getElementById('sectorHighlights');
+  if (activeSector !== 'all') { el.innerHTML = ''; return; }
+
+  // 각 섹터별 최신 1건씩
+  const cards = [];
+  for (const [key, sec] of Object.entries(SECTORS)) {
+    if (key === 'all') continue;
+    const latest = allNews.find(n => n.sector === key);
+    if (!latest) continue;
+    const t = latest.time;
+    const timeStr = `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`;
+    cards.push(`
+      <div class="sector-card" onclick="window.open('${latest.link}','_blank')">
+        <div class="sector-card-header">
+          <span class="sector-card-badge ${sec.cls}">${sec.icon} ${sec.label}</span>
+          <span class="sector-card-time">${timeStr}</span>
+        </div>
+        <div class="sector-card-title">${latest.title}</div>
+      </div>
+    `);
+  }
+  el.innerHTML = cards.join('');
+}
+
+function renderLog() {
+  const el = document.getElementById('logList');
+  const list = filtered();
+  document.getElementById('logTotal').textContent = `총 ${list.length}건`;
+
+  if (!list.length) {
+    el.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>첫 번째 수집을 기다리고 있습니다...</p></div>';
+    return;
+  }
+
+  // 최신건(히어로) 제외, 나머지 로그
+  const logItems = list.slice(1);
+  el.innerHTML = logItems.map(n => {
+    const sec = sectorInfo(n.sector);
+    const t = n.time;
+    const timeStr = `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`;
+    return `<div class="log-item ${n.isNew ? 'log-item-new' : ''}" onclick="window.open('${n.link}','_blank')">
+      <span class="log-item-time">${timeStr}</span>
+      <span class="log-item-sector ${sec.cls}">${sec.label}</span>
+      <span class="log-item-title">${n.title}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── 섹터 전환 ──
+function switchSector(key) {
+  activeSector = key;
+  renderAll();
+}
+
+// ── 카운트다운 ──
+function tickCountdown() {
+  countdownSec--;
+  if (countdownSec <= 0) {
+    collectNews();
+  }
+  const mm = Math.floor(countdownSec / 60);
+  const ss = countdownSec % 60;
+  document.getElementById('countdown').textContent = `${mm}:${ss.toString().padStart(2,'0')}`;
+}
+
+// ── 초기화 ──
+(async function init() {
+  await collectNews();
+  setInterval(tickCountdown, 1000);
+})();
+</script>
+</body>
+</html>
