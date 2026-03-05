@@ -148,7 +148,7 @@
   }
   @keyframes logFadeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
   .log-item:hover { background: rgba(255,255,255,0.05); }
-  .log-item-time { font-size: 11px; color: #475569; min-width: 55px; font-variant-numeric: tabular-nums; }
+  .log-item-time { font-size: 11px; color: #475569; min-width: 72px; font-variant-numeric: tabular-nums; }
   .log-item-sector { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 600; min-width: 56px; text-align: center; }
   .log-item-title { font-size: 13px; color: #94a3b8; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .log-item:hover .log-item-title { color: #e0e6f0; }
@@ -310,6 +310,35 @@ function classifySector(title) {
 function sectorInfo(key) { return SECTORS[key] || SECTORS.all; }
 
 // ═══════════════════════════════════════════
+//  시간 포맷 — 뉴스 발행(pubDate) 기준
+// ═══════════════════════════════════════════
+function formatPubTime(date) {
+  const now = new Date();
+  const diff = now - date;
+  const mins = Math.floor(diff / 60000);
+  const hrs  = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  // 상대 시간
+  let ago;
+  if (mins < 1)       ago = '방금';
+  else if (mins < 60) ago = `${mins}분 전`;
+  else if (hrs < 24)  ago = `${hrs}시간 전`;
+  else if (days < 7)  ago = `${days}일 전`;
+  else                ago = `${date.getMonth()+1}/${date.getDate()}`;
+
+  // 절대 시간 (오늘이면 시:분, 아닌 날이면 월/일 시:분)
+  const hh = date.getHours().toString().padStart(2,'0');
+  const mm = date.getMinutes().toString().padStart(2,'0');
+  const isToday = now.toDateString() === date.toDateString();
+  const abs = isToday
+    ? `${hh}:${mm}`
+    : `${date.getMonth()+1}/${date.getDate()} ${hh}:${mm}`;
+
+  return { ago, abs, full: `${ago} (${abs})` };
+}
+
+// ═══════════════════════════════════════════
 //  중복 관리 (시간 경과 후 같은 제목 재등장 허용)
 // ═══════════════════════════════════════════
 function cleanExpiredTitles() {
@@ -438,15 +467,15 @@ function renderHero() {
   }
   const latest = list[0];
   const sec = sectorInfo(latest.sector);
-  const t = latest.time;
-  const timeStr = `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`;
+  const pub = formatPubTime(latest.time);
   el.innerHTML = `
     <div class="hero-label"><div class="blink"></div> 최신 헤드라인</div>
     <div class="hero-card" onclick="window.open('${latest.link}','_blank')">
       <span class="hero-sector-badge ${sec.cls}">${sec.icon} ${sec.label}</span>
       <div class="hero-title">${latest.title}</div>
       <div class="hero-meta">
-        <span>🕐 ${timeStr}</span>
+        <span>🕐 ${pub.ago}</span>
+        <span style="color:#475569;font-size:11px;">${pub.abs}</span>
         <span>📰 ${latest.source}</span>
         ${latest.isNew ? '<span style="color:#38bdf8;font-weight:600">✨ NEW</span>' : ''}
       </div>
@@ -461,12 +490,11 @@ function renderSectorHighlights() {
     if (key === 'all') continue;
     const latest = allNews.find(n => n.sector === key);
     if (!latest) continue;
-    const t = latest.time;
-    const timeStr = `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`;
+    const pub = formatPubTime(latest.time);
     cards.push(`<div class="sector-card" onclick="window.open('${latest.link}','_blank')">
       <div class="sector-card-header">
         <span class="sector-card-badge ${sec.cls}">${sec.icon} ${sec.label}</span>
-        <span class="sector-card-time">${timeStr}</span>
+        <span class="sector-card-time">${pub.ago}</span>
       </div>
       <div class="sector-card-title">${latest.title}</div>
     </div>`);
@@ -484,10 +512,9 @@ function renderLog() {
   }
   el.innerHTML = list.slice(1).map(n => {
     const sec = sectorInfo(n.sector);
-    const t = n.time;
-    const timeStr = `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`;
+    const pub = formatPubTime(n.time);
     return `<div class="log-item ${n.isNew ? 'log-item-new' : ''}" onclick="window.open('${n.link}','_blank')">
-      <span class="log-item-time">${timeStr}</span>
+      <span class="log-item-time" title="${pub.abs}">${pub.ago}</span>
       <span class="log-item-sector ${sec.cls}">${sec.label}</span>
       <span class="log-item-title">${n.title}</span>
     </div>`;
