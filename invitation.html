@@ -126,10 +126,11 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
-    padding: 0 30px 80px;
+    padding: 0 20px 80px;
     text-align: center;
     color: var(--cream);
     z-index: 2;
+    width: 100%;
   }
   .hero-date-top {
     position: absolute;
@@ -138,48 +139,53 @@
     transform: translateX(-50%);
     font-family: 'Cormorant Garamond', serif;
     font-weight: 300;
-    font-size: 13px;
-    letter-spacing: 0.5em;
+    font-size: clamp(11px, 3.2vw, 13px);
+    letter-spacing: 0.4em;
     color: var(--cream);
     opacity: 0.85;
+    white-space: nowrap;
   }
   .hero-date-top::before,
   .hero-date-top::after {
     content: '';
     display: inline-block;
-    width: 28px;
+    width: clamp(20px, 6vw, 28px);
     height: 1px;
     background: var(--cream);
     vertical-align: middle;
-    margin: 0 14px;
+    margin: 0 10px;
     opacity: 0.6;
   }
   .hero-title {
     font-family: 'Cormorant Garamond', serif;
     font-style: italic;
     font-weight: 300;
-    font-size: 42px;
-    letter-spacing: 0.08em;
+    font-size: clamp(28px, 8vw, 42px);
+    letter-spacing: 0.05em;
     margin-bottom: 14px;
     opacity: 0;
     animation: fadeUp 1.4s ease 0.3s forwards;
+    white-space: nowrap;
   }
   .hero-names {
     font-family: 'Nanum Myeongjo', serif;
     font-weight: 400;
-    font-size: 22px;
-    letter-spacing: 0.6em;
+    font-size: clamp(16px, 5vw, 22px);
+    letter-spacing: 0.25em;
     margin-bottom: 22px;
     opacity: 0;
     animation: fadeUp 1.4s ease 0.7s forwards;
+    white-space: nowrap;
+    max-width: 100%;
   }
   .hero-date {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 16px;
-    letter-spacing: 0.3em;
+    font-size: clamp(12px, 3.8vw, 16px);
+    letter-spacing: 0.25em;
     font-weight: 300;
     opacity: 0;
     animation: fadeUp 1.4s ease 1.1s forwards;
+    white-space: nowrap;
   }
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(20px); }
@@ -246,9 +252,14 @@
 
   /* ===== 섹션 공통 ===== */
   section {
-    padding: 90px 32px;
+    padding: 90px 24px;
     position: relative;
     background: var(--paper);
+  }
+  @media (max-width: 400px) {
+    section {
+      padding: 70px 20px;
+    }
   }
   .section-label {
     font-family: 'Cormorant Garamond', serif;
@@ -262,8 +273,8 @@
   .section-title {
     font-family: 'Nanum Myeongjo', serif;
     font-weight: 800;
-    font-size: 22px;
-    letter-spacing: 0.3em;
+    font-size: clamp(18px, 5.5vw, 22px);
+    letter-spacing: 0.25em;
     color: var(--forest-deep);
     text-align: center;
     margin-bottom: 50px;
@@ -350,7 +361,7 @@
   .date-big {
     font-family: 'Cormorant Garamond', serif;
     font-weight: 300;
-    font-size: 68px;
+    font-size: clamp(56px, 17vw, 68px);
     color: var(--forest-deep);
     letter-spacing: 0.05em;
     line-height: 1;
@@ -359,10 +370,10 @@
   .date-labels {
     display: flex;
     justify-content: center;
-    gap: 40px;
+    gap: clamp(20px, 8vw, 40px);
     font-family: 'Cormorant Garamond', serif;
-    font-size: 13px;
-    letter-spacing: 0.3em;
+    font-size: clamp(11px, 3.2vw, 13px);
+    letter-spacing: 0.25em;
     color: var(--forest-soft);
     text-transform: uppercase;
   }
@@ -688,14 +699,15 @@
   .ending-couple {
     font-family: 'Nanum Myeongjo', serif;
     font-weight: 700;
-    font-size: 18px;
-    letter-spacing: 0.5em;
+    font-size: clamp(14px, 4.5vw, 18px);
+    letter-spacing: 0.3em;
     color: var(--cream);
     padding-top: 30px;
     border-top: 1px solid rgba(245, 241, 232, 0.3);
     display: inline-block;
-    padding-left: 30px;
-    padding-right: 30px;
+    padding-left: 20px;
+    padding-right: 20px;
+    white-space: nowrap;
   }
   .ending-date {
     margin-top: 16px;
@@ -740,7 +752,7 @@
     <div class="hero-date-top">2026 · 06 · 27</div>
     <div class="hero-content">
       <div class="hero-title">We're getting married</div>
-      <div class="hero-names">문택 &nbsp;·&nbsp; 지연</div>
+      <div class="hero-names">임문택 &nbsp;·&nbsp; 장지연</div>
       <div class="hero-date">SATURDAY · 11:00 AM</div>
     </div>
   </section>
@@ -909,7 +921,7 @@
       오솔길 끝에서 만난 두 사람,<br>
       이제 같은 길을 걷겠습니다.
     </p>
-    <div class="ending-couple">임 문 택 &nbsp; · &nbsp; 장 지 연</div>
+    <div class="ending-couple">임문택 &nbsp;·&nbsp; 장지연</div>
     <div class="ending-date">2026 . 06 . 27 . SATURDAY</div>
   </section>
 
