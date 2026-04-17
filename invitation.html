@@ -192,6 +192,101 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
+  /* ===== 음악 인트로 오버레이 ===== */
+  .intro-overlay {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(180deg,
+      rgba(45, 58, 46, 0.92) 0%,
+      rgba(30, 40, 30, 0.96) 100%);
+    backdrop-filter: blur(20px);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 30px;
+    color: var(--cream);
+    transition: opacity 0.8s ease, visibility 0.8s ease;
+  }
+  .intro-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .intro-leaf-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 30px;
+    opacity: 0.8;
+    animation: leafSway 3s ease-in-out infinite;
+  }
+  @keyframes leafSway {
+    0%, 100% { transform: rotate(-8deg); }
+    50% { transform: rotate(8deg); }
+  }
+  .intro-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: clamp(24px, 7vw, 32px);
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+  }
+  .intro-names {
+    font-family: 'Nanum Myeongjo', serif;
+    font-weight: 400;
+    font-size: clamp(15px, 4.5vw, 18px);
+    letter-spacing: 0.25em;
+    margin-bottom: 40px;
+    opacity: 0.9;
+  }
+  .intro-message {
+    font-family: 'Gowun Batang', serif;
+    font-size: clamp(13px, 3.8vw, 15px);
+    line-height: 1.9;
+    opacity: 0.85;
+    margin-bottom: 50px;
+    max-width: 320px;
+  }
+  .intro-btn {
+    background: var(--cream);
+    color: var(--forest-deep);
+    border: none;
+    padding: 16px 42px;
+    font-family: 'Nanum Myeongjo', serif;
+    font-size: clamp(13px, 3.8vw, 15px);
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    cursor: pointer;
+    border-radius: 40px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .intro-btn:hover,
+  .intro-btn:active {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+  }
+  .intro-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  .intro-sub {
+    margin-top: 20px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    opacity: 0.6;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  .intro-sub:hover { opacity: 1; }
+
   /* ===== 음악 플레이어 ===== */
   .music-player {
     position: absolute;
@@ -729,6 +824,26 @@
 </style>
 </head>
 <body>
+
+<!-- 음악 인트로 오버레이 -->
+<div class="intro-overlay" id="introOverlay">
+  <svg class="intro-leaf-icon" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2C8 6 6 10 6 14c0 4 3 7 6 8 3-1 6-4 6-8 0-4-2-8-6-12z"/>
+  </svg>
+  <div class="intro-title">We're getting married</div>
+  <div class="intro-names">임문택 &nbsp;·&nbsp; 장지연</div>
+  <div class="intro-message">
+    숲길을 거닐 듯 천천히<br>
+    저희의 이야기를 감상해 주세요.<br>
+    <span style="opacity:0.7; font-size:0.9em;">음악과 함께 보시는 것을 추천드립니다.</span>
+  </div>
+  <button class="intro-btn" id="introStart">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    <span>시 작 하 기</span>
+  </button>
+  <div class="intro-sub" id="introSkip">음악 없이 보기</div>
+</div>
+
 <div class="wrapper">
 
   <!-- 나뭇잎 흩날리는 효과 -->
@@ -1050,41 +1165,105 @@ const audio = document.getElementById('audioPlayer');
 const upload = document.getElementById('musicUpload');
 const musicPath = document.getElementById('musicPath');
 
-// 음악 파일이 같은 폴더에 있으면 자동 로드 (예: wedding.mp3)
-// 사용자가 직접 파일 선택 가능
-audio.src = 'wedding.mp3'; // 같은 폴더에 wedding.mp3 넣으면 자동 재생됨
+// 음악 파일이 같은 폴더에 있으면 로드
+audio.src = 'music.mp3';
+audio.volume = 0.6; // 적당한 볼륨
 
+const PLAY_ICON = 'M8 5v14l11-7z';
+const PAUSE_ICON = 'M6 4h4v16H6zm8 0h4v16h-4z';
+
+function setPlayingUI(isPlaying) {
+  if (isPlaying) {
+    player.classList.add('playing');
+    musicPath.setAttribute('d', PAUSE_ICON);
+  } else {
+    player.classList.remove('playing');
+    musicPath.setAttribute('d', PLAY_ICON);
+  }
+}
+
+function tryPlayMusic() {
+  return audio.play().then(() => {
+    setPlayingUI(true);
+    return true;
+  }).catch((err) => {
+    console.log('음악 재생 실패:', err);
+    setPlayingUI(false);
+    return false;
+  });
+}
+
+/* ========== 인트로 오버레이 ========== */
+const introOverlay = document.getElementById('introOverlay');
+const introStart = document.getElementById('introStart');
+const introSkip = document.getElementById('introSkip');
+
+// "시작하기" 버튼 - 사용자가 탭 = 자동재생 정책 통과
+introStart.addEventListener('click', async () => {
+  await tryPlayMusic();
+  introOverlay.classList.add('hidden');
+  // 완전히 숨겨지면 DOM에서 제거
+  setTimeout(() => introOverlay.style.display = 'none', 900);
+});
+
+// "음악 없이 보기" - 음악 없이 진입
+introSkip.addEventListener('click', () => {
+  introOverlay.classList.add('hidden');
+  setTimeout(() => introOverlay.style.display = 'none', 900);
+});
+
+// 페이지 로드 시 자동 재생 시도 (대부분 차단되지만 일단 시도)
+window.addEventListener('load', () => {
+  // 음소거 상태로 재생 시도 → 성공하면 사용자 상호작용 시 볼륨 복구
+  audio.muted = true;
+  audio.play().then(() => {
+    // 자동재생 성공: 인트로에서 버튼 누르면 소리 켜기
+    console.log('자동재생 준비 완료');
+  }).catch(() => {
+    console.log('자동재생 차단됨 - 인트로 버튼 대기');
+  });
+});
+
+/* ========== 음악 버튼 클릭 (재생/정지) ========== */
 player.addEventListener('click', (e) => {
-  // 길게 누르면 파일 업로드
   if (!audio.src || audio.error) {
     upload.click();
     return;
   }
 
   if (audio.paused) {
-    audio.play().then(() => {
-      player.classList.add('playing');
-      // 일시정지 아이콘으로
-      musicPath.setAttribute('d', 'M6 4h4v16H6zm8 0h4v16h-4z');
-    }).catch(() => {
-      upload.click();
-    });
+    audio.muted = false;
+    tryPlayMusic();
   } else {
     audio.pause();
-    player.classList.remove('playing');
-    // 재생 아이콘으로
-    musicPath.setAttribute('d', 'M8 5v14l11-7z');
+    setPlayingUI(false);
   }
 });
 
-// 길게 눌러서 파일 교체
+// 인트로 시작 시 음소거 해제
+introStart.addEventListener('click', () => {
+  audio.muted = false;
+});
+
+/* ========== 음악 파일 직접 업로드 (길게 누르기) ========== */
 let pressTimer;
+let longPressTriggered = false;
+
 player.addEventListener('mousedown', () => {
-  pressTimer = setTimeout(() => upload.click(), 800);
+  longPressTriggered = false;
+  pressTimer = setTimeout(() => {
+    longPressTriggered = true;
+    upload.click();
+  }, 1500);
 });
 player.addEventListener('mouseup', () => clearTimeout(pressTimer));
+player.addEventListener('mouseleave', () => clearTimeout(pressTimer));
 player.addEventListener('touchstart', () => {
-  pressTimer = setTimeout(() => upload.click(), 800);
+  longPressTriggered = false;
+  pressTimer = setTimeout(() => {
+    longPressTriggered = true;
+    upload.click();
+  }, 1500);
 });
 player.addEventListener('touchend', () => clearTimeout(pressTimer));
 
@@ -1092,10 +1271,15 @@ upload.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (file) {
     audio.src = URL.createObjectURL(file);
-    audio.play();
-    player.classList.add('playing');
-    musicPath.setAttribute('d', 'M6 4h4v16H6zm8 0h4v16h-4z');
+    audio.muted = false;
+    tryPlayMusic();
   }
+});
+
+// 음악이 끝나면 자동 반복 (이미 loop 속성 있지만 안전용)
+audio.addEventListener('ended', () => {
+  audio.currentTime = 0;
+  audio.play();
 });
 
 /* ========== 계좌 토글 ========== */
