@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🍇 포도알 보상판</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg1:#fdf2ff; --bg2:#eef0ff; --bg3:#fde8f3;
+    --card:#ffffff; --ink:#5b4a6b; --ink-soft:#9b8aad;
+    --grape:#a78bfa; --grape-deep:#7c3aed; --grape-dark:#6d28d9;
+    --pink:#fb9fd0; --gold:#ffd56b; --gold-deep:#f5b73d;
+    --red:#e0518a; --green:#16a36a;
+    --shadow:0 10px 30px rgba(124,58,237,.12);
+    --shadow-sm:0 4px 14px rgba(124,58,237,.10);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Gaegu','Apple SD Gothic Neo','Malgun Gothic',sans-serif;color:var(--ink);
+    background:linear-gradient(135deg,var(--bg1),var(--bg2) 55%,var(--bg3));
+    min-height:100vh;background-attachment:fixed;-webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.jua{font-family:'Jua','Apple SD Gothic Neo',sans-serif;font-weight:400;}
+  .wrap{max-width:920px;margin:0 auto;padding:16px 16px 70px;}
+
+  .topbar{display:flex;align-items:center;gap:10px;padding:8px 2px 4px;flex-wrap:wrap;}
+  .topbar .brand{font-family:'Jua',sans-serif;font-size:24px;color:var(--grape-dark);cursor:pointer;}
+  .topbar .spacer{flex:1;}
+  .conn{font-size:13px;color:var(--ink-soft);display:flex;align-items:center;gap:5px;}
+  .dot{width:9px;height:9px;border-radius:50%;background:#bbb;}
+  .dot.on{background:#33c781;} .dot.off{background:#e06b6b;}
+
+  .card{background:var(--card);border-radius:24px;box-shadow:var(--shadow);padding:20px;margin:14px 0;}
+  .card h2{font-size:20px;margin:0 0 12px;color:var(--grape-dark);display:flex;align-items:center;gap:8px;}
+
+  .row{display:flex;gap:10px;flex-wrap:wrap;}
+  input[type=text],input[type=url],input[type=number]{
+    flex:1;min-width:0;font-family:inherit;font-size:17px;color:var(--ink);
+    padding:12px 15px;border:2px solid #ecdffb;border-radius:14px;background:#fbf7ff;outline:none;transition:border .15s;
+  }
+  input:focus{border-color:var(--grape);}
+  button{
+    font-family:'Jua',sans-serif;font-size:16px;cursor:pointer;border:none;border-radius:14px;
+    padding:12px 20px;color:#fff;background:linear-gradient(135deg,var(--grape),var(--grape-deep));
+    box-shadow:0 4px 0 var(--grape-dark);transition:transform .08s,box-shadow .08s;white-space:nowrap;
+  }
+  button:active{transform:translateY(3px);box-shadow:0 1px 0 var(--grape-dark);}
+  button.ghost{background:#fff;color:var(--grape-deep);box-shadow:0 3px 0 #e3d4f7;border:2px solid #ecdffb;}
+  button.ghost:active{transform:translateY(2px);box-shadow:0 0 0 #e3d4f7;}
+  button.pink{background:linear-gradient(135deg,var(--pink),#f06fb6);box-shadow:0 4px 0 #d44d99;}
+  button.small{font-size:13px;padding:7px 12px;box-shadow:0 3px 0 var(--grape-dark);}
+  button.small.ghost{box-shadow:0 3px 0 #e3d4f7;}
+  .hint{font-size:13px;color:var(--ink-soft);margin:8px 2px 0;}
+  .feedback{margin-top:9px;font-size:15px;min-height:20px;font-family:'Jua',sans-serif;}
+  .feedback.ok{color:var(--green);} .feedback.bad{color:var(--red);}
+  .muted{color:var(--ink-soft);font-size:14px;}
+
+  /* 보상판 목록 */
+  .board-card{display:flex;align-items:center;gap:14px;cursor:pointer;background:linear-gradient(180deg,#fff,#fbf5ff);}
+  .board-card:hover{transform:translateY(-2px);transition:transform .12s;}
+  .board-card .bicon{font-size:34px;}
+  .board-card .binfo{flex:1;min-width:0;}
+  .board-card .bname{font-family:'Jua',sans-serif;font-size:20px;color:var(--grape-dark);}
+  .board-card .bsub{font-size:13px;color:var(--ink-soft);margin-top:2px;}
+  .bar{height:12px;background:#eee6f7;border-radius:8px;overflow:hidden;margin-top:8px;}
+  .bar .fill{height:100%;background:linear-gradient(90deg,var(--grape),var(--grape-deep));border-radius:8px;transition:width .4s;}
+  .pill{background:#fff3d6;border:1px solid var(--gold);color:var(--gold-deep);border-radius:12px;padding:3px 10px;font-size:13px;white-space:nowrap;}
+
+  /* 포도송이 */
+  .cluster-card{text-align:center;background:linear-gradient(180deg,#fff,#fbf5ff);position:relative;overflow:hidden;}
+  .cluster-card.near{animation:glowpulse 1s infinite;}
+  @keyframes glowpulse{0%,100%{box-shadow:0 0 14px 2px rgba(245,183,61,.5),var(--shadow);}50%{box-shadow:0 0 26px 8px rgba(245,183,61,.85),var(--shadow);}}
+  .stem{width:10px;height:24px;background:linear-gradient(#b07a4e,#8a5a32);border-radius:6px;margin:0 auto -4px;}
+  .leaf{font-size:28px;margin-bottom:-6px;display:inline-block;transform:rotate(-12deg);}
+  .cluster{display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 0 4px;}
+  .grow-row{display:flex;gap:7px;justify-content:center;}
+  .grape{width:30px;height:32px;display:flex;align-items:center;justify-content:center;}
+  .grape svg{display:block;}
+  @keyframes pop{0%{transform:scale(0) rotate(-30deg);}60%{transform:scale(1.35) rotate(8deg);}100%{transform:scale(1);}}
+  .grape.justpopped{animation:pop .45s cubic-bezier(.2,1.3,.4,1);}
+  .progress-text{margin-top:10px;color:var(--ink-soft);font-size:16px;}
+  .progress-text b{color:var(--grape-deep);font-family:'Jua',sans-serif;font-size:19px;}
+  .floatup{position:absolute;left:50%;top:38%;transform:translateX(-50%);font-family:'Jua',sans-serif;font-size:30px;color:var(--grape-deep);pointer-events:none;animation:floaty 1.1s ease-out forwards;z-index:5;}
+  @keyframes floaty{0%{opacity:0;transform:translate(-50%,12px) scale(.7);}20%{opacity:1;}100%{opacity:0;transform:translate(-50%,-52px) scale(1.1);}}
+
+  /* 팝업 */
+  .overlay{position:fixed;inset:0;background:rgba(91,74,107,.35);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(2px);}
+  .overlay.show{display:flex;animation:fadein .2s;}
+  @keyframes fadein{from{opacity:0;}to{opacity:1;}}
+  .reveal{background:#fff;border-radius:28px;padding:28px 32px;text-align:center;box-shadow:0 20px 60px rgba(124,58,237,.35);transform:scale(.7);animation:popin .45s cubic-bezier(.2,1.4,.4,1) forwards;max-width:88vw;}
+  @keyframes popin{to{transform:scale(1);}}
+  .reveal .grapes-burst{font-size:52px;display:flex;justify-content:center;align-items:center;gap:5px;min-height:64px;}
+  .reveal.rolling .grapes-burst{animation:shakeRoll .25s infinite;}
+  @keyframes shakeRoll{0%,100%{transform:rotate(-8deg) scale(1);}50%{transform:rotate(8deg) scale(1.12);}}
+  .reveal .title{font-family:'Jua',sans-serif;font-size:28px;color:var(--grape-dark);margin:6px 0;}
+  .reveal .sub{color:var(--ink-soft);font-size:17px;margin-bottom:16px;}
+  .reveal.lecture-pop .title{color:var(--gold-deep);}
+  .reveal.lecture-pop{box-shadow:0 20px 70px rgba(245,183,61,.5);}
+  .confetti{position:fixed;top:-30px;font-size:22px;z-index:60;pointer-events:none;will-change:transform;}
+  @keyframes fall{to{transform:translateY(108vh) rotate(540deg);opacity:.9;}}
+  .flash{position:fixed;inset:0;background:#fff;z-index:55;pointer-events:none;opacity:0;}
+  .flash.go{animation:flashAnim .5s ease-out;}
+  @keyframes flashAnim{0%{opacity:.6;}100%{opacity:0;}}
+
+  footer{text-align:center;color:var(--ink-soft);font-size:12px;margin-top:22px;}
+  footer a{color:var(--ink-soft);}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-database-compat.js"></script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<radialGradient id="gFill" cx="34%" cy="28%" r="82%"><stop offset="0%" stop-color="#e7dbff"/><stop offset="42%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#6d28d9"/></radialGradient>
+</defs></svg>
+<div class="wrap">
+  <div class="topbar">
+    <span class="brand" data-action="home">🍇 포도알 보상판</span>
+    <span class="spacer"></span>
+    <span class="conn"><span class="dot" id="connDot"></span><span id="connText">연결 중…</span></span>
+  </div>
+  <div id="app"></div>
+  <footer>Firebase 실시간 저장 · podotree &nbsp;·&nbsp; <a href="admin.html">관리자 페이지</a></footer>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="reveal" id="reveal">
+    <div class="grapes-burst" id="revealBurst">🎁</div>
+    <div class="title" id="revealTitle">두구두구…</div>
+    <div class="sub" id="revealSub">포도알 뽑는 중!</div>
+    <button id="revealClose">좋아 🍇</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===== 설정 ===== */
+var DB_URL = "https://podotree-43c54-default-rtdb.asia-southeast1.firebasedatabase.app";
+var EXPIRE_DAYS = 2;   // 등록 후 이 일수가 지나면 그 글의 포도알은 자동 차감(만료). 0 미만으로는 안 내려감.
+
+/* ===== Firebase ===== */
+var db = null, fatal = null;
+try{
+  firebase.initializeApp({ databaseURL: DB_URL });
+  db = firebase.database();
+}catch(e){ fatal = e; }
+
+/* ===== 상태 ===== */
+var boards = {};
+var view = "list";          // list | detail
+var currentId = null;
+var prevFilled = 0, GROW_ROWS = null, GROW_FOR = -1;
+
+/* ===== 순수 로직 ===== */
+var TRACKING = ["utm_source","utm_medium","utm_campaign","utm_term","utm_content","fbclid","gclid","igshid","spm","ref","ref_src","src","cid"];
+function normalizeUrl(raw){
+  if(!raw) return null;
+  var s = String(raw).trim(); if(s==="") return null;
+  if(!/^https?:\/\//i.test(s)) s = "https://" + s;
+  var u; try{ u = new URL(s); }catch(e){ return null; }
+  if(u.protocol!=="http:" && u.protocol!=="https:") return null;
+  if(!u.hostname || u.hostname.indexOf(".")===-1) return null;
+  var host = u.hostname.toLowerCase().replace(/^www\./,"").replace(/^m\./,"");
+  var path = u.pathname.replace(/\/+$/,""); if(path==="") path="/";
+  var params = [];
+  u.searchParams.forEach(function(v,k){ if(TRACKING.indexOf(k.toLowerCase())===-1) params.push([k,v]); });
+  params.sort(function(a,b){ return a[0]<b[0]?-1:a[0]>b[0]?1:(a[1]<b[1]?-1:1); });
+  var q = params.map(function(p){ return p[0]+"="+p[1]; }).join("&");
+  return host + path + (q?"?"+q:"");
+}
+// 1알 94% / 2알 5% / 3알 1%
+function rollDraw(){
+  var r = Math.random();
+  if(r < 0.01) return 3;
+  if(r < 0.06) return 2;
+  return 1;
+}
+
+/* ===== 파생값 ===== */
+function goalOf(b){ return (b && b.goal) ? b.goal : 30; }
+function totalOf(b){ return (b && b.totalGrapes) ? b.totalGrapes : 0; }
+function grapesOf(b){ return totalOf(b) % goalOf(b); }
+function earnedOf(b){ return Math.floor(totalOf(b) / goalOf(b)); }
+function linkPairs(b){
+  if(!b || !b.links) return [];
+  return Object.keys(b.links).map(function(k){ return [k, b.links[k]]; })
+    .sort(function(a,b2){ return (b2[1].at||0) - (a[1].at||0); });
+}
+// 등록 후 EXPIRE_DAYS일 지난 글의 포도알 자동 차감(만료 표시). 0 미만 방지.
+function sweepExpired(){
+  if(!db) return;
+  var now = Date.now(), ms = EXPIRE_DAYS*24*60*60*1000;
+  Object.keys(boards).forEach(function(id){
+    var b = boards[id]; if(!b || !b.links) return;
+    var dec = 0, updates = {};
+    Object.keys(b.links).forEach(function(k){
+      var L = b.links[k];
+      if(L && !L.expired && L.at && (now - L.at) > ms){
+        dec += (L.grapes||0);
+        updates["boards/"+id+"/links/"+k+"/expired"] = true;
+      }
+    });
+    if(dec > 0){
+      updates["boards/"+id+"/totalGrapes"] = Math.max(0, totalOf(b) - dec);
+      db.ref().update(updates);
+    }
+  });
+}
+
+/* ===== Firebase 액션 ===== */
+function createBoard(name, goal){
+  var r = db.ref("boards").push();
+  return r.set({ name:name, goal:goal, totalGrapes:0, createdAt:Date.now() });
+}
+function registerLink(id, raw){
+  var b = boards[id]; if(!b) return;
+  var canon = normalizeUrl(raw);
+  var fb = document.getElementById("linkFeedback");
+  if(!canon){ setFb(fb,"올바른 링크 형식이 아니에요. 예: https://blog.naver.com/아이디/글번호","bad"); playSound("bad"); return; }
+  var links = b.links || {};
+  for(var k in links){ if(links[k].canonical===canon){ setFb(fb,"이미 등록한 글이에요! 🙅 (중복 링크)","bad"); playSound("bad"); return; } }
+  var draw = rollDraw();
+  var goal = goalOf(b);
+  var oldTotal = totalOf(b);
+  var newTotal = oldTotal + draw;
+  var gainedReward = Math.floor(newTotal/goal) > Math.floor(oldTotal/goal);
+  var key = db.ref("boards/"+id+"/links").push().key;
+  var updates = {};
+  updates["boards/"+id+"/links/"+key] = { url:String(raw).trim(), canonical:canon, grapes:draw, at:Date.now() };
+  updates["boards/"+id+"/totalGrapes"] = newTotal;
+  db.ref().update(updates).then(function(){
+    var el = document.getElementById("linkInput"); if(el) el.value="";
+    setFb(fb,"등록 완료! 포도알 "+draw+"알 획득 🍇","ok");
+    floatUp("+"+draw+"알");
+    showDraw({ n:draw, gainedReward:gainedReward, remaining: goal - (newTotal%goal), earned: Math.floor(newTotal/goal) });
+  }).catch(function(err){ setFb(fb,"저장 실패: "+(err.message||err),"bad"); });
+}
+
+/* ===== 렌더 ===== */
+function setFb(el,msg,cls){ if(el){ el.textContent=msg; el.className="feedback "+(cls||""); } }
+function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+function timeAgo(ts){ var s=Math.floor((Date.now()-ts)/1000); if(s<60)return"방금"; if(s<3600)return Math.floor(s/60)+"분 전"; if(s<86400)return Math.floor(s/3600)+"시간 전"; return Math.floor(s/86400)+"일 전"; }
+
+function render(){
+  var app = document.getElementById("app");
+  if(fatal){ app.innerHTML = '<div class="card"><h2>⚠️ 오류</h2><p class="muted">'+esc(fatal.message||String(fatal))+'</p></div>'; return; }
+  if(view==="detail" && boards[currentId]){ app.innerHTML = renderDetail(); afterDetail(); return; }
+  view="list"; app.innerHTML = renderList();
+}
+
+function renderList(){
+  var ids = Object.keys(boards);
+  var html = "";
+  if(ids.length===0){
+    html += '<div class="card"><p class="muted">아직 보상판이 없어요. 아래에서 첫 보상판을 만들어보세요! 🍇</p></div>';
+  } else {
+    html += ids.map(function(id){
+      var b = boards[id], goal=goalOf(b), g=grapesOf(b), earned=earnedOf(b);
+      var pct = Math.round(g/goal*100);
+      return '<div class="card board-card" data-action="open" data-id="'+id+'">'
+        + '<div class="bicon">'+grapeSVG(true,false,34)+'</div>'
+        + '<div class="binfo"><div class="bname">'+esc(b.name||"이름 없는 보상판")+'</div>'
+        + '<div class="bsub">포도알 '+g+' / '+goal+' 알</div>'
+        + '<div class="bar"><div class="fill" style="width:'+pct+'%"></div></div></div>'
+        + (earned>0 ? '<span class="pill">🏆 '+earned+'번 달성</span>' : '')
+        + '</div>';
+    }).join("");
+  }
+  html += '<div class="card"><h2>＋ 새 보상판 만들기</h2>'
+    + '<div class="row"><input type="text" id="newBoardName" placeholder="보상판 이름 (예: 강의권 보상판)" autocomplete="off" /></div>'
+    + '<div class="row" style="margin-top:10px;align-items:center;">'
+    + '<span class="muted">목표 포도알</span><input type="number" id="newBoardGoal" value="30" min="1" max="500" style="max-width:120px;" />'
+    + '<button class="pink" data-action="create">만들기</button></div>'
+    + '<div class="hint">이 목표 개수를 모으면 보상(예: 강의권) 1번 달성으로 쳐요.</div></div>';
+  return html;
+}
+
+function renderDetail(){
+  var b = boards[currentId], goal=goalOf(b), g=grapesOf(b), earned=earnedOf(b), left=goal-g;
+  var pairs = linkPairs(b);
+  var html = '<div class="row" style="margin-bottom:6px;"><button class="ghost small" data-action="home">← 목록</button></div>';
+  html += '<div style="text-align:center;margin:4px 0 2px;"><h1 style="font-size:28px;margin:0;color:var(--grape-dark);">'+esc(b.name||"보상판")+'</h1>'
+    + '<p class="muted" style="margin:4px 0;">🏆 지금까지 '+earned+'번 달성 · 목표 '+goal+'알</p></div>';
+  html += '<div class="card cluster-card'+((left<=3&&g>0)?' near':'')+'" id="clusterCard">'
+    + '<svg viewBox="0 0 90 42" width="92" height="44" style="display:block;margin:0 auto -8px;" aria-hidden="true"><path d="M45 42 C45 26 44 16 47 8" stroke="#8a5a32" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M47 12 C58 1 76 4 82 12 C73 21 57 21 47 14 Z" fill="#7bd592"/><path d="M45 15 C33 6 16 9 11 17 C20 25 36 24 45 17 Z" fill="#86e3a3"/></svg>'
+    + '<div class="cluster" id="cluster"></div>'
+    + '<div class="progress-text" id="progressText"><b>'+g+'</b> / '+goal+' 알 &nbsp;·&nbsp; 목표까지 <b>'+left+'</b>알!</div></div>';
+  html += '<div class="card"><h2>✍️ 블로그 글 등록</h2>'
+    + '<div class="row"><input type="text" id="linkInput" placeholder="작성한 블로그 글 주소를 붙여넣어 주세요" autocomplete="off" />'
+    + '<button data-action="register">등록하고 포도알 받기</button></div>'
+    + '<div class="feedback" id="linkFeedback"></div>'
+    + '<div class="hint">같은 글(링크)은 중복으로 인정되지 않아요. 새 글 주소를 넣으면 랜덤으로 <b>1~3알</b>이 떨어져요. 등록 후 <b>'+EXPIRE_DAYS+'일</b>이 지나면 그 포도알은 자동으로 사라져요(0 미만으로는 안 내려가요).</div></div>';
+  html += '<div class="card"><h2>📜 등록한 블로그 주소 ('+pairs.length+')</h2>';
+  if(pairs.length===0){ html += '<p class="muted">아직 등록한 글이 없어요.</p>'; }
+  else {
+    html += pairs.map(function(p){
+      var L=p[1], exp=!!L.expired;
+      var right = exp
+        ? '<span style="color:#b3a6c4;font-family:Jua,sans-serif;white-space:nowrap;"><span style="text-decoration:line-through;">+'+(L.grapes||0)+'알</span> 만료 · '+timeAgo(L.at)+'</span>'
+        : '<span style="color:var(--grape-deep);font-family:Jua,sans-serif;white-space:nowrap;">+'+(L.grapes||0)+'알 · '+timeAgo(L.at)+'</span>';
+      return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:7px 2px;border-bottom:1px dashed #eee;opacity:'+(exp?'.6':'1')+';">'
+        + '<a href="'+esc(L.url)+'" target="_blank" rel="noopener" style="color:var(--grape-deep);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;">'+esc(L.url)+'</a>'
+        + right + '</div>';
+    }).join("");
+  }
+  html += '</div>';
+  return html;
+}
+
+/* 포도송이 그리기 */
+function buildRows(size){
+  var rows=[], rem=size, w=Math.max(4, Math.round(Math.sqrt(size)+1));
+  while(rem>0){ var t=Math.min(w,rem); rows.push(t); rem-=t; if(rows.length>=2&&w>1) w--; }
+  return rows;
+}
+// SVG 포도알 한 알 (그라데이션 + 하이라이트)
+function grapeSVG(filled, mark, size){
+  size = size||30;
+  var s = '<svg viewBox="0 0 36 38" width="'+size+'" height="'+Math.round(size*38/36)+'">';
+  if(filled){
+    s += '<ellipse cx="18" cy="20" rx="14" ry="15" fill="url(#gFill)" stroke="rgba(255,255,255,.55)" stroke-width="1.5"/>'
+       + '<ellipse cx="12.3" cy="11.8" rx="4.6" ry="3" fill="rgba(255,255,255,.82)" transform="rotate(-22 12.3 11.8)"/>'
+       + '<ellipse cx="10.6" cy="24.4" rx="2.4" ry="1.4" fill="#ff8fb5" opacity=".55"/>'
+       + '<ellipse cx="25.4" cy="24.4" rx="2.4" ry="1.4" fill="#ff8fb5" opacity=".55"/>'
+       + '<circle cx="13.9" cy="20.2" r="1.8" fill="#46285f"/>'
+       + '<circle cx="22.1" cy="20.2" r="1.8" fill="#46285f"/>'
+       + '<path d="M15.4 25 Q18 27.4 20.6 25" stroke="#46285f" stroke-width="1.3" fill="none" stroke-linecap="round"/>';
+  } else {
+    s += '<ellipse cx="18" cy="20" rx="13.5" ry="14.5" fill="#efe9fb" stroke="#d6c8f2" stroke-width="2" stroke-dasharray="3 3"/>';
+  }
+  if(mark){ s += '<ellipse cx="18" cy="20" rx="16.5" ry="17.5" fill="none" stroke="#f5b73d" stroke-width="1.4" stroke-dasharray="2 3" opacity="'+(filled?'.9':'.55')+'"/>'; }
+  return s + '</svg>';
+}
+function afterDetail(){
+  var b=boards[currentId]; if(!b) return;
+  var goal=goalOf(b), filled=grapesOf(b);
+  if(GROW_FOR!==goal){ GROW_ROWS=buildRows(goal); GROW_FOR=goal; }
+  var cont=document.getElementById("cluster"); if(!cont) return;
+  var html="", idx=0;
+  for(var r=0;r<GROW_ROWS.length;r++){
+    html+='<div class="grow-row">';
+    for(var c=0;c<GROW_ROWS[r];c++){
+      var isF=idx<filled, jp=(idx>=prevFilled&&idx<filled), mk=((idx+1)%5===0);
+      html+='<div class="grape'+(jp?' justpopped':'')+'">'+grapeSVG(isF, mk, 30)+'</div>';
+      idx++;
+    }
+    html+='</div>';
+  }
+  cont.innerHTML=html; prevFilled=filled;
+}
+
+/* ===== 연출 ===== */
+function floatUp(text){
+  var card=document.getElementById("clusterCard"); if(!card) return;
+  var el=document.createElement("div"); el.className="floatup"; el.textContent=text;
+  card.appendChild(el); setTimeout(function(){ el.remove(); }, 1150);
+}
+function showDraw(ev){
+  var overlay=document.getElementById("overlay"), reveal=document.getElementById("reveal");
+  document.getElementById("revealClose").style.visibility="hidden";
+  document.getElementById("revealBurst").innerHTML = grapeSVG(true,false,52);
+  document.getElementById("revealTitle").textContent = "두구두구…";
+  document.getElementById("revealSub").textContent = "포도알 뽑는 중!";
+  reveal.className="reveal rolling"; overlay.classList.add("show");
+  playSound("roll");
+  setTimeout(function(){ revealResult(ev); }, 900);
+}
+function revealResult(ev){
+  var reveal=document.getElementById("reveal");
+  document.getElementById("revealClose").style.visibility="visible";
+  var burst, title, sub, cls="reveal", flash=null;
+  var urgent = ev.gainedReward ? false : (ev.remaining<=3 && ev.remaining>0);
+  if(ev.gainedReward){
+    burst="🏆"; title="목표 달성! 🎉"; sub="축하해요! 지금까지 "+ev.earned+"번 달성"; cls+=" lecture-pop"; flash="gold";
+    playSound("lecture"); confetti(["🏆","🍇","🎉","🎊","✨"]);
+  } else {
+    burst=""; for(var gi=0;gi<ev.n;gi++){ burst+=grapeSVG(true,false,46); } title="+"+ev.n+" 포도알!"+(ev.n>=3?" 잭팟! 🎉":""); sub= urgent ? ("목표까지 단 "+ev.remaining+"알!! 🔥") : ("목표까지 "+ev.remaining+"알!");
+    playSound(ev.n>=3?"jackpot":"pop"); if(ev.n>=3) confetti(["🍇","✨","🎉"]);
+  }
+  document.getElementById("revealBurst").innerHTML=burst;
+  document.getElementById("revealTitle").textContent=title;
+  document.getElementById("revealSub").textContent=sub;
+  reveal.className=cls;
+  if(flash) screenFlash(flash);
+}
+function closeReveal(){ document.getElementById("overlay").classList.remove("show"); }
+function confetti(emojis){
+  for(var i=0;i<26;i++){(function(){
+    var el=document.createElement("div"); el.className="confetti";
+    el.textContent=emojis[Math.floor(Math.random()*emojis.length)];
+    el.style.left=Math.random()*100+"vw";
+    var d=1.6+Math.random()*1.4; el.style.animation="fall "+d+"s linear forwards";
+    el.style.fontSize=(16+Math.random()*16)+"px";
+    document.body.appendChild(el); setTimeout(function(){ el.remove(); }, d*1000+100);
+  })();}
+}
+function screenFlash(color){
+  var f=document.createElement("div"); f.className="flash";
+  if(color==="gold") f.style.background="#ffe9a8";
+  document.body.appendChild(f);
+  requestAnimationFrame(function(){ f.classList.add("go"); });
+  setTimeout(function(){ f.remove(); }, 520);
+}
+
+/* ===== 효과음 ===== */
+var actx=null, soundOn=true;
+function ac(){ if(!soundOn) return null; try{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==="suspended") actx.resume(); return actx; }catch(e){ return null; } }
+function beep(f,s,d,t,v){ var c=ac(); if(!c) return; var o=c.createOscillator(),g=c.createGain(); o.type=t||"sine"; o.frequency.value=f; o.connect(g); g.connect(c.destination); var x=c.currentTime+(s||0); g.gain.setValueAtTime(0.0001,x); g.gain.exponentialRampToValueAtTime(v||0.16,x+0.02); g.gain.exponentialRampToValueAtTime(0.0001,x+d); o.start(x); o.stop(x+d+0.02); }
+function playSound(k){
+  if(!soundOn) return;
+  if(k==="pop"){ beep(523,0,0.12,"triangle",0.15); beep(784,0.05,0.14,"triangle",0.13); }
+  else if(k==="roll"){ [0,0.15,0.3,0.45].forEach(function(t){ beep(700,t,0.05,"square",0.07); }); }
+  else if(k==="jackpot"){ [523,659,784,1047,1319].forEach(function(f,i){ beep(f,i*0.08,0.2,"square",0.13); }); }
+  else if(k==="lecture"){ [523,659,784,1047,1319].forEach(function(f,i){ beep(f,i*0.1,0.32,"triangle",0.15); }); }
+  else if(k==="bad"){ beep(220,0,0.18,"sawtooth",0.10); }
+}
+
+/* ===== 이벤트 ===== */
+document.addEventListener("click", function(e){
+  var t = e.target.closest("[data-action]"); if(!t) return;
+  var a = t.dataset.action, id = t.dataset.id;
+  if(a==="home"){ view="list"; currentId=null; render(); }
+  else if(a==="open"){ currentId=id; view="detail"; prevFilled=0; render(); }
+  else if(a==="create"){ doCreate(); }
+  else if(a==="register"){ registerLink(currentId, (document.getElementById("linkInput")||{}).value||""); }
+});
+document.addEventListener("keydown", function(e){
+  if(e.key!=="Enter") return;
+  var el=e.target;
+  if(el.id==="linkInput"){ registerLink(currentId, el.value); }
+  else if(el.id==="newBoardName" || el.id==="newBoardGoal"){ doCreate(); }
+});
+function doCreate(){
+  var name=((document.getElementById("newBoardName")||{}).value||"").trim();
+  var goal=Math.max(1, parseInt((document.getElementById("newBoardGoal")||{}).value,10)||30);
+  if(name===""){ alert("보상판 이름을 입력해 주세요."); return; }
+  createBoard(name, goal);
+}
+document.getElementById("revealClose").addEventListener("click", closeReveal);
+document.getElementById("overlay").addEventListener("click", function(e){ if(e.target===this) closeReveal(); });
+
+/* ===== 연결 + 데이터 구독 ===== */
+function start(){
+  if(fatal){ render(); return; }
+  db.ref(".info/connected").on("value", function(s){
+    var on=!!s.val();
+    document.getElementById("connDot").className="dot "+(on?"on":"off");
+    document.getElementById("connText").textContent= on?"연결됨":"오프라인";
+  });
+  db.ref("boards").on("value", function(snap){
+    boards = snap.val() || {};
+    sweepExpired();
+    render();
+  }, function(err){
+    fatal = err;
+    var app=document.getElementById("app");
+    var perm = (err.code==="PERMISSION_DENIED") || /permission/i.test(err.message||"");
+    app.innerHTML = '<div class="card"><h2>🔒 데이터베이스 접근이 막혀 있어요</h2>'
+      + '<p class="muted">'+esc(err.message||String(err))+'</p>'
+      + (perm ? '<p>Firebase 콘솔 → Realtime Database → <b>규칙</b> 탭에서 아래처럼 바꿔주세요 (테스트용):</p>'
+        + '<pre style="background:#2a2240;color:#eadcff;padding:12px;border-radius:12px;overflow:auto;">{\n  "rules": {\n    ".read": true,\n    ".write": true\n  }\n}</pre>'
+        + '<p class="hint">※ 누구나 읽고 쓸 수 있게 열어둡니다. 공개 공유 시엔 로그인 기반 규칙으로 바꾸세요.</p>' : '')
+      + '</div>';
+  });
+}
+start();
+setInterval(function(){ sweepExpired(); }, 3600000);
+</script>
+</body>
+</html>

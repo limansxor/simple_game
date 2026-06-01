@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🔐 포도알 보상판 · 관리자</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg1:#f4f1fb; --bg2:#eef0ff;
+    --card:#ffffff; --ink:#3f3550; --ink-soft:#8a7c9c;
+    --grape:#a78bfa; --grape-deep:#7c3aed; --grape-dark:#6d28d9;
+    --red:#e0518a; --green:#16a36a; --gold-deep:#f5b73d;
+    --shadow:0 8px 24px rgba(124,58,237,.12); --shadow-sm:0 4px 14px rgba(124,58,237,.10);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:'Gaegu','Apple SD Gothic Neo','Malgun Gothic',sans-serif;color:var(--ink);
+    background:linear-gradient(135deg,var(--bg1),var(--bg2));min-height:100vh;-webkit-font-smoothing:antialiased;}
+  h1,h2,.jua{font-family:'Jua','Apple SD Gothic Neo',sans-serif;font-weight:400;}
+  .wrap{max-width:920px;margin:0 auto;padding:16px 16px 70px;}
+  .topbar{display:flex;align-items:center;gap:10px;padding:8px 2px;flex-wrap:wrap;}
+  .topbar .brand{font-family:'Jua',sans-serif;font-size:22px;color:var(--grape-dark);}
+  .topbar .spacer{flex:1;}
+  .conn{font-size:13px;color:var(--ink-soft);display:flex;align-items:center;gap:5px;}
+  .dot{width:9px;height:9px;border-radius:50%;background:#bbb;}
+  .dot.on{background:#33c781;} .dot.off{background:#e06b6b;}
+
+  .card{background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:18px;margin:12px 0;}
+  .card h2{font-size:19px;margin:0 0 10px;color:var(--grape-dark);}
+  .muted{color:var(--ink-soft);font-size:14px;}
+  a{color:var(--grape-deep);}
+
+  button{font-family:'Jua',sans-serif;font-size:15px;cursor:pointer;border:none;border-radius:12px;padding:10px 16px;color:#fff;
+    background:linear-gradient(135deg,var(--grape),var(--grape-deep));box-shadow:0 3px 0 var(--grape-dark);transition:transform .08s,box-shadow .08s;}
+  button:active{transform:translateY(3px);box-shadow:0 0 0 var(--grape-dark);}
+  button.ghost{background:#fff;color:var(--grape-deep);box-shadow:0 3px 0 #e3d4f7;border:2px solid #ecdffb;}
+  button.danger{background:linear-gradient(135deg,#ff8aa6,#e0518a);box-shadow:0 3px 0 #c23a72;}
+  button.small{font-size:12px;padding:6px 11px;}
+  input{font-family:inherit;font-size:16px;color:var(--ink);padding:11px 14px;border:2px solid #ecdffb;border-radius:12px;background:#fbf7ff;outline:none;}
+  input:focus{border-color:var(--grape);}
+
+  .adm-board{background:#fff;border-radius:16px;box-shadow:var(--shadow-sm);padding:14px 16px;margin-bottom:12px;}
+  .adm-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .adm-head .nm{font-family:'Jua',sans-serif;font-size:18px;color:var(--grape-dark);flex:1;min-width:120px;cursor:pointer;}
+  .adm-meta{font-size:13px;color:var(--ink-soft);margin:8px 0 2px;}
+  .adm-meta code{background:#f3eefb;border-radius:6px;padding:2px 7px;color:var(--grape-deep);font-family:'Gaegu',monospace;}
+  .links-tbl{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px;}
+  .links-tbl th,.links-tbl td{text-align:left;padding:7px 8px;border-bottom:1px solid #f0eaf8;vertical-align:middle;}
+  .links-tbl th{color:var(--ink-soft);font-weight:normal;font-size:12px;}
+  .links-tbl td.url{max-width:330px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .links-tbl a{text-decoration:none;}
+  .links-tbl .gv{font-family:'Jua',sans-serif;color:var(--grape-deep);white-space:nowrap;}
+  .empty{color:var(--ink-soft);font-size:14px;padding:6px 2px;}
+  .lock{max-width:420px;margin:60px auto;text-align:center;}
+  .lock input{width:100%;margin:14px 0;text-align:center;}
+  footer{text-align:center;color:var(--ink-soft);font-size:12px;margin-top:22px;}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-database-compat.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <span class="brand">🔐 관리자 · 데이터</span>
+    <span class="spacer"></span>
+    <span class="conn"><span class="dot" id="connDot"></span><span id="connText">연결 중…</span></span>
+    <a href="index.html"><button class="ghost small">👤 사용자 화면</button></a>
+  </div>
+  <div id="app"></div>
+  <footer>Firebase 실시간 · podotree</footer>
+</div>
+
+<script>
+"use strict";
+
+/* ===== 설정 ===== */
+var DB_URL = "https://podotree-43c54-default-rtdb.asia-southeast1.firebasedatabase.app";
+var ADMIN_PASS = "1234";   // 관리자 비밀번호 (바꾸세요). ""로 두면 잠금 해제.
+var EXPIRE_DAYS = 2;       // 등록 후 이 일수가 지나면 포도알 자동 차감(만료). index.html과 같게 맞추세요.
+
+/* ===== Firebase ===== */
+var db = null, fatal = null;
+try{ firebase.initializeApp({ databaseURL: DB_URL }); db = firebase.database(); }catch(e){ fatal = e; }
+
+/* ===== 상태 ===== */
+var boards = {};
+var unlocked = false;
+var expanded = {};
+var started = false;
+
+/* ===== 파생값 ===== */
+function goalOf(b){ return (b && b.goal) ? b.goal : 30; }
+function totalOf(b){ return (b && b.totalGrapes) ? b.totalGrapes : 0; }
+function grapesOf(b){ return totalOf(b) % goalOf(b); }
+function earnedOf(b){ return Math.floor(totalOf(b) / goalOf(b)); }
+function linkPairs(b){
+  if(!b || !b.links) return [];
+  return Object.keys(b.links).map(function(k){ return [k, b.links[k]]; })
+    .sort(function(a,b2){ return (b2[1].at||0) - (a[1].at||0); });
+}
+function sweepExpired(){
+  if(!db) return;
+  var now = Date.now(), ms = EXPIRE_DAYS*24*60*60*1000;
+  Object.keys(boards).forEach(function(id){
+    var b = boards[id]; if(!b || !b.links) return;
+    var dec = 0, updates = {};
+    Object.keys(b.links).forEach(function(k){
+      var L = b.links[k];
+      if(L && !L.expired && L.at && (now - L.at) > ms){
+        dec += (L.grapes||0);
+        updates["boards/"+id+"/links/"+k+"/expired"] = true;
+      }
+    });
+    if(dec > 0){
+      updates["boards/"+id+"/totalGrapes"] = Math.max(0, totalOf(b) - dec);
+      db.ref().update(updates);
+    }
+  });
+}
+function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+function timeAgo(ts){ var s=Math.floor((Date.now()-ts)/1000); if(s<60)return"방금"; if(s<3600)return Math.floor(s/60)+"분 전"; if(s<86400)return Math.floor(s/3600)+"시간 전"; return Math.floor(s/86400)+"일 전"; }
+
+/* ===== 액션 ===== */
+function deleteLink(id, key){
+  var b = boards[id]; if(!b || !b.links || !b.links[key]) return;
+  var L = b.links[key];
+  var g = L.expired ? 0 : (L.grapes || 0);   // 이미 만료된 글은 포도알이 이미 빠졌으니 추가 차감 0
+  if(!window.confirm("이 블로그 주소를 삭제하면 포도알 "+g+"개가 차감돼요.\n진행할까요?")) return;
+  var newTotal = Math.max(0, totalOf(b) - g);
+  var updates = {};
+  updates["boards/"+id+"/links/"+key] = null;
+  updates["boards/"+id+"/totalGrapes"] = newTotal;
+  db.ref().update(updates);
+}
+function deleteBoard(id){
+  var b = boards[id]; if(!b) return;
+  if(!window.confirm("'"+(b.name||"이 보상판")+"'을(를) 통째로 삭제할까요?\n포도알·블로그 주소·목표가 모두 사라져요. (되돌릴 수 없음)")) return;
+  db.ref("boards/"+id).remove();
+}
+function editBoard(id){
+  var b = boards[id]; if(!b) return;
+  var name = window.prompt("보상판 이름", b.name||"");
+  if(name===null) return;
+  var goalStr = window.prompt("목표 포도알 수 (이 개수를 모으면 1번 달성)", String(goalOf(b)));
+  if(goalStr===null) return;
+  var goal = Math.max(1, parseInt(goalStr,10)||goalOf(b));
+  db.ref("boards/"+id).update({ name:(name.trim()||b.name), goal:goal });
+}
+
+/* ===== 렌더 ===== */
+function render(){
+  var app = document.getElementById("app");
+  if(fatal){
+    var perm = (fatal.code==="PERMISSION_DENIED") || /permission/i.test(fatal.message||"");
+    app.innerHTML = '<div class="card"><h2>🔒 데이터베이스 접근이 막혀 있어요</h2><p class="muted">'+esc(fatal.message||String(fatal))+'</p>'
+      + (perm ? '<p>Firebase 콘솔 → Realtime Database → <b>규칙</b>에서 <code>.read</code>/<code>.write</code>를 <code>true</code>로 바꿔주세요.</p>' : '')
+      + '</div>';
+    return;
+  }
+  if(!unlocked){
+    app.innerHTML = '<div class="card lock"><h2>🔐 관리자 로그인</h2>'
+      + '<p class="muted">관리자 비밀번호를 입력하세요.</p>'
+      + '<input type="password" id="passInput" placeholder="비밀번호" autocomplete="off" />'
+      + '<button id="passBtn">들어가기</button></div>';
+    var pb=document.getElementById("passBtn"), pi=document.getElementById("passInput");
+    pb.addEventListener("click", tryUnlock);
+    pi.addEventListener("keydown", function(e){ if(e.key==="Enter") tryUnlock(); });
+    pi.focus();
+    return;
+  }
+  app.innerHTML = renderData();
+}
+
+function tryUnlock(){
+  var v=(document.getElementById("passInput")||{}).value||"";
+  if(ADMIN_PASS!=="" && v!==ADMIN_PASS){ alert("비밀번호가 달라요."); return; }
+  unlocked = true; render();
+}
+
+function renderData(){
+  var ids = Object.keys(boards);
+  var html = '<div class="card"><h2>데이터 · 보상판 '+ids.length+'개</h2>'
+    + '<p class="muted">포도알·블로그 주소·목표를 확인하고 정리해요. 블로그 주소를 삭제하면 그만큼 포도알이 자동 차감되고, 미달이 되면 달성 횟수도 줄어요.</p></div>';
+  if(ids.length===0){ html += '<div class="card"><p class="empty">데이터가 없어요. 사용자 화면에서 보상판을 먼저 만들어 보세요.</p></div>'; return html; }
+  html += ids.map(function(id){
+    var b=boards[id], goal=goalOf(b), total=totalOf(b), g=grapesOf(b), earned=earnedOf(b);
+    var pairs = linkPairs(b);
+    var expCount = pairs.filter(function(p){ return p[1].expired; }).length;
+    var open = !!expanded[id];
+    var s = '<div class="adm-board">'
+      + '<div class="adm-head"><span class="nm" data-action="toggle" data-id="'+id+'">'+(open?"▼":"▶")+' '+esc(b.name||"이름없음")+'</span>'
+      + '<button class="small ghost" data-action="edit" data-id="'+id+'">이름·목표 수정</button>'
+      + '<button class="small danger" data-action="delboard" data-id="'+id+'">보상판 삭제</button></div>'
+      + '<div class="adm-meta">목표 <code>'+goal+'</code> · 누적포도 <code>'+total+'</code> · 현재 <code>'+g+'/'+goal+'</code> · 달성 <code>'+earned+'</code> · 글 <code>'+pairs.length+'</code>'+(expCount?' · 만료 <code>'+expCount+'</code>':'')+'</div>';
+    if(open){
+      if(pairs.length===0){ s += '<p class="empty">등록된 블로그 주소가 없어요.</p>'; }
+      else{
+        s += '<table class="links-tbl"><thead><tr><th>#</th><th>블로그 주소</th><th>포도</th><th>등록</th><th></th></tr></thead><tbody>';
+        s += pairs.map(function(p,i){
+          var L=p[1], exp=!!L.expired, effG=exp?0:(L.grapes||0);
+          return '<tr style="opacity:'+(exp?'.55':'1')+'"><td>'+(i+1)+'</td>'
+            + '<td class="url"><a href="'+esc(L.url)+'" target="_blank" rel="noopener">'+esc(L.url)+'</a></td>'
+            + '<td class="gv">'+(exp?'<span style="text-decoration:line-through;">+'+(L.grapes||0)+'</span> 만료':'+'+(L.grapes||0))+'</td>'
+            + '<td class="muted">'+timeAgo(L.at)+'</td>'
+            + '<td><button class="small danger" data-action="dellink" data-id="'+id+'" data-key="'+p[0]+'">삭제 −'+effG+'</button></td></tr>';
+        }).join("");
+        s += '</tbody></table>';
+      }
+    }
+    s += '</div>';
+    return s;
+  }).join("");
+  return html;
+}
+
+/* ===== 이벤트 ===== */
+document.addEventListener("click", function(e){
+  var t = e.target.closest("[data-action]"); if(!t) return;
+  var a=t.dataset.action, id=t.dataset.id;
+  if(a==="toggle"){ expanded[id]=!expanded[id]; render(); }
+  else if(a==="edit"){ editBoard(id); }
+  else if(a==="delboard"){ deleteBoard(id); }
+  else if(a==="dellink"){ deleteLink(id, t.dataset.key); }
+});
+
+/* ===== 시작 ===== */
+function start(){
+  render();
+  if(fatal) return;
+  db.ref(".info/connected").on("value", function(s){
+    var on=!!s.val();
+    var dot=document.getElementById("connDot"), txt=document.getElementById("connText");
+    if(dot) dot.className="dot "+(on?"on":"off");
+    if(txt) txt.textContent= on?"연결됨":"오프라인";
+  });
+  db.ref("boards").on("value", function(snap){
+    boards = snap.val() || {};
+    sweepExpired();
+    render();
+  }, function(err){ fatal = err; render(); });
+}
+start();
+setInterval(function(){ sweepExpired(); }, 3600000);
+</script>
+</body>
+</html>
