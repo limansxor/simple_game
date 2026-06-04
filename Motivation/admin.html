@@ -78,8 +78,8 @@
 
 /* ===== 설정 ===== */
 var DB_URL = "https://podotree-43c54-default-rtdb.asia-southeast1.firebasedatabase.app";
-var ADMIN_PASS = "1234";   // 관리자 비밀번호 (바꾸세요). ""로 두면 잠금 해제.
-var EXPIRE_DAYS = 2;       // 등록 후 이 일수가 지나면 포도알 자동 차감(만료). index.html과 같게 맞추세요.
+var ADMIN_PASS = "2345";   // 관리자 비밀번호. ""로 두면 잠금 해제.
+var DECAY_DAYS = 2;        // 이 일수 안에 새 글이 없으면 포도알 1개씩 자동 차감. index.html과 같게 맞추세요.
 
 /* ===== Firebase ===== */
 var db = null, fatal = null;
@@ -101,23 +101,29 @@ function linkPairs(b){
   return Object.keys(b.links).map(function(k){ return [k, b.links[k]]; })
     .sort(function(a,b2){ return (b2[1].at||0) - (a[1].at||0); });
 }
-function sweepExpired(){
+function latestPostAt(b){
+  var t = (b && b.lastPostAt) || 0;
+  if(b && b.links){ Object.keys(b.links).forEach(function(k){ var a=(b.links[k]&&b.links[k].at)||0; if(a>t) t=a; }); }
+  return t || (b && b.createdAt) || Date.now();
+}
+// 미활동 패널티: 마지막 글 이후 DECAY_DAYS일이 지날 때마다 포도알 1개 차감. 0 미만 방지.
+function sweepDecay(){
   if(!db) return;
-  var now = Date.now(), ms = EXPIRE_DAYS*24*60*60*1000;
+  var now = Date.now(), ms = DECAY_DAYS*24*60*60*1000;
   Object.keys(boards).forEach(function(id){
-    var b = boards[id]; if(!b || !b.links) return;
-    var dec = 0, updates = {};
-    Object.keys(b.links).forEach(function(k){
-      var L = b.links[k];
-      if(L && !L.expired && L.at && (now - L.at) > ms){
-        dec += (L.grapes||0);
-        updates["boards/"+id+"/links/"+k+"/expired"] = true;
-      }
-    });
+    var b = boards[id]; if(!b) return;
+    var base = Math.max(latestPostAt(b), b.lastDecayAt||0);
+    var win = Math.floor((now - base)/ms);
+    if(win < 1) return;
+    var total = totalOf(b);
+    var dec = Math.min(win, total);
+    var updates = {};
+    updates["boards/"+id+"/lastDecayAt"] = base + win*ms;
     if(dec > 0){
-      updates["boards/"+id+"/totalGrapes"] = Math.max(0, totalOf(b) - dec);
-      db.ref().update(updates);
+      updates["boards/"+id+"/totalGrapes"] = total - dec;
+      updates["boards/"+id+"/decayedTotal"] = (b.decayedTotal||0) + dec;
     }
+    db.ref().update(updates);
   });
 }
 function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
@@ -126,8 +132,7 @@ function timeAgo(ts){ var s=Math.floor((Date.now()-ts)/1000); if(s<60)return"방
 /* ===== 액션 ===== */
 function deleteLink(id, key){
   var b = boards[id]; if(!b || !b.links || !b.links[key]) return;
-  var L = b.links[key];
-  var g = L.expired ? 0 : (L.grapes || 0);   // 이미 만료된 글은 포도알이 이미 빠졌으니 추가 차감 0
+  var g = b.links[key].grapes || 0;
   if(!window.confirm("이 블로그 주소를 삭제하면 포도알 "+g+"개가 차감돼요.\n진행할까요?")) return;
   var newTotal = Math.max(0, totalOf(b) - g);
   var updates = {};
@@ -139,6 +144,22 @@ function deleteBoard(id){
   var b = boards[id]; if(!b) return;
   if(!window.confirm("'"+(b.name||"이 보상판")+"'을(를) 통째로 삭제할까요?\n포도알·블로그 주소·목표가 모두 사라져요. (되돌릴 수 없음)")) return;
   db.ref("boards/"+id).remove();
+}
+function restoreDecayed(id){
+  var b = boards[id]; if(!b) return;
+  var d = b.decayedTotal||0; if(d<=0) return;
+  if(!window.confirm("미활동으로 차감된 포도알 "+d+"개를 모두 복구할까요?")) return;
+  db.ref("boards/"+id).update({ totalGrapes: totalOf(b)+d, decayedTotal: 0 });
+}
+function adjustGrapes(id){
+  var b = boards[id]; if(!b) return;
+  var v = window.prompt("더하거나 뺄 포도알 수를 입력하세요 (예: 3 또는 -2)", "0");
+  if(v===null) return;
+  var d = parseInt(v,10);
+  if(isNaN(d) || d===0) return;
+  var nt = Math.max(0, totalOf(b)+d);
+  if(!window.confirm("누적 포도알을 "+totalOf(b)+" → "+nt+"(으)로 바꿀까요?")) return;
+  db.ref("boards/"+id).update({ totalGrapes: nt });
 }
 function editBoard(id){
   var b = boards[id]; if(!b) return;
@@ -188,24 +209,25 @@ function renderData(){
   html += ids.map(function(id){
     var b=boards[id], goal=goalOf(b), total=totalOf(b), g=grapesOf(b), earned=earnedOf(b);
     var pairs = linkPairs(b);
-    var expCount = pairs.filter(function(p){ return p[1].expired; }).length;
     var open = !!expanded[id];
     var s = '<div class="adm-board">'
       + '<div class="adm-head"><span class="nm" data-action="toggle" data-id="'+id+'">'+(open?"▼":"▶")+' '+esc(b.name||"이름없음")+'</span>'
+      + ((b.decayedTotal||0)>0 ? '<button class="small" data-action="restore" data-id="'+id+'">차감 복구 +'+b.decayedTotal+'</button>' : '')
+      + '<button class="small ghost" data-action="adjust" data-id="'+id+'">포도알 조정</button>'
       + '<button class="small ghost" data-action="edit" data-id="'+id+'">이름·목표 수정</button>'
       + '<button class="small danger" data-action="delboard" data-id="'+id+'">보상판 삭제</button></div>'
-      + '<div class="adm-meta">목표 <code>'+goal+'</code> · 누적포도 <code>'+total+'</code> · 현재 <code>'+g+'/'+goal+'</code> · 달성 <code>'+earned+'</code> · 글 <code>'+pairs.length+'</code>'+(expCount?' · 만료 <code>'+expCount+'</code>':'')+'</div>';
+      + '<div class="adm-meta">목표 <code>'+goal+'</code> · 누적포도 <code>'+total+'</code> · 현재 <code>'+g+'/'+goal+'</code> · 달성 <code>'+earned+'</code> · 글 <code>'+pairs.length+'</code> · 마지막 글 <code>'+(pairs.length?timeAgo(latestPostAt(b)):"없음")+'</code>'+((b.decayedTotal||0)?' · 미활동 차감 <code>'+b.decayedTotal+'</code>':'')+'</div>';
     if(open){
       if(pairs.length===0){ s += '<p class="empty">등록된 블로그 주소가 없어요.</p>'; }
       else{
         s += '<table class="links-tbl"><thead><tr><th>#</th><th>블로그 주소</th><th>포도</th><th>등록</th><th></th></tr></thead><tbody>';
         s += pairs.map(function(p,i){
-          var L=p[1], exp=!!L.expired, effG=exp?0:(L.grapes||0);
-          return '<tr style="opacity:'+(exp?'.55':'1')+'"><td>'+(i+1)+'</td>'
+          var L=p[1];
+          return '<tr><td>'+(i+1)+'</td>'
             + '<td class="url"><a href="'+esc(L.url)+'" target="_blank" rel="noopener">'+esc(L.url)+'</a></td>'
-            + '<td class="gv">'+(exp?'<span style="text-decoration:line-through;">+'+(L.grapes||0)+'</span> 만료':'+'+(L.grapes||0))+'</td>'
+            + '<td class="gv">+'+(L.grapes||0)+'</td>'
             + '<td class="muted">'+timeAgo(L.at)+'</td>'
-            + '<td><button class="small danger" data-action="dellink" data-id="'+id+'" data-key="'+p[0]+'">삭제 −'+effG+'</button></td></tr>';
+            + '<td><button class="small danger" data-action="dellink" data-id="'+id+'" data-key="'+p[0]+'">삭제 −'+(L.grapes||0)+'</button></td></tr>';
         }).join("");
         s += '</tbody></table>';
       }
@@ -221,6 +243,8 @@ document.addEventListener("click", function(e){
   var t = e.target.closest("[data-action]"); if(!t) return;
   var a=t.dataset.action, id=t.dataset.id;
   if(a==="toggle"){ expanded[id]=!expanded[id]; render(); }
+  else if(a==="restore"){ restoreDecayed(id); }
+  else if(a==="adjust"){ adjustGrapes(id); }
   else if(a==="edit"){ editBoard(id); }
   else if(a==="delboard"){ deleteBoard(id); }
   else if(a==="dellink"){ deleteLink(id, t.dataset.key); }
@@ -238,12 +262,12 @@ function start(){
   });
   db.ref("boards").on("value", function(snap){
     boards = snap.val() || {};
-    sweepExpired();
+    sweepDecay();
     render();
   }, function(err){ fatal = err; render(); });
 }
 start();
-setInterval(function(){ sweepExpired(); }, 3600000);
+setInterval(function(){ sweepDecay(); }, 3600000);
 </script>
 </body>
 </html>

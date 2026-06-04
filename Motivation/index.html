@@ -140,7 +140,7 @@
 
 /* ===== 설정 ===== */
 var DB_URL = "https://podotree-43c54-default-rtdb.asia-southeast1.firebasedatabase.app";
-var EXPIRE_DAYS = 2;   // 등록 후 이 일수가 지나면 그 글의 포도알은 자동 차감(만료). 0 미만으로는 안 내려감.
+var DECAY_DAYS = 2;    // 마지막 글 이후 이 일수 안에 새 글이 없으면 포도알 1개씩 자동 차감. 0 미만으로는 안 내려감.
 
 /* ===== Firebase ===== */
 var db = null, fatal = null;
@@ -190,31 +190,38 @@ function linkPairs(b){
   return Object.keys(b.links).map(function(k){ return [k, b.links[k]]; })
     .sort(function(a,b2){ return (b2[1].at||0) - (a[1].at||0); });
 }
-// 등록 후 EXPIRE_DAYS일 지난 글의 포도알 자동 차감(만료 표시). 0 미만 방지.
-function sweepExpired(){
+// 마지막 글 시각 (등록된 글 중 최신, 없으면 생성 시각)
+function latestPostAt(b){
+  var t = (b && b.lastPostAt) || 0;
+  if(b && b.links){ Object.keys(b.links).forEach(function(k){ var a=(b.links[k]&&b.links[k].at)||0; if(a>t) t=a; }); }
+  return t || (b && b.createdAt) || Date.now();
+}
+// 미활동 패널티: 마지막 글 이후 DECAY_DAYS일이 지날 때마다 포도알 1개 차감. 0 미만 방지.
+// 이미 얻은 글의 포도알은 건드리지 않음. 새 글을 올리면 시계가 리셋됨.
+function sweepDecay(){
   if(!db) return;
-  var now = Date.now(), ms = EXPIRE_DAYS*24*60*60*1000;
+  var now = Date.now(), ms = DECAY_DAYS*24*60*60*1000;
   Object.keys(boards).forEach(function(id){
-    var b = boards[id]; if(!b || !b.links) return;
-    var dec = 0, updates = {};
-    Object.keys(b.links).forEach(function(k){
-      var L = b.links[k];
-      if(L && !L.expired && L.at && (now - L.at) > ms){
-        dec += (L.grapes||0);
-        updates["boards/"+id+"/links/"+k+"/expired"] = true;
-      }
-    });
+    var b = boards[id]; if(!b) return;
+    var base = Math.max(latestPostAt(b), b.lastDecayAt||0);
+    var win = Math.floor((now - base)/ms);
+    if(win < 1) return;
+    var total = totalOf(b);
+    var dec = Math.min(win, total);   // 0 미만 방지
+    var updates = {};
+    updates["boards/"+id+"/lastDecayAt"] = base + win*ms;   // 차감 시계 전진(중복 차감 방지)
     if(dec > 0){
-      updates["boards/"+id+"/totalGrapes"] = Math.max(0, totalOf(b) - dec);
-      db.ref().update(updates);
+      updates["boards/"+id+"/totalGrapes"] = total - dec;
+      updates["boards/"+id+"/decayedTotal"] = (b.decayedTotal||0) + dec;
     }
+    db.ref().update(updates);
   });
 }
 
 /* ===== Firebase 액션 ===== */
 function createBoard(name, goal){
   var r = db.ref("boards").push();
-  return r.set({ name:name, goal:goal, totalGrapes:0, createdAt:Date.now() });
+  return r.set({ name:name, goal:goal, totalGrapes:0, createdAt:Date.now(), lastPostAt:Date.now() });
 }
 function registerLink(id, raw){
   var b = boards[id]; if(!b) return;
@@ -232,6 +239,7 @@ function registerLink(id, raw){
   var updates = {};
   updates["boards/"+id+"/links/"+key] = { url:String(raw).trim(), canonical:canon, grapes:draw, at:Date.now() };
   updates["boards/"+id+"/totalGrapes"] = newTotal;
+  updates["boards/"+id+"/lastPostAt"] = Date.now();
   db.ref().update(updates).then(function(){
     var el = document.getElementById("linkInput"); if(el) el.value="";
     setFb(fb,"등록 완료! 포도알 "+draw+"알 획득 🍇","ok");
@@ -284,7 +292,7 @@ function renderDetail(){
   var pairs = linkPairs(b);
   var html = '<div class="row" style="margin-bottom:6px;"><button class="ghost small" data-action="home">← 목록</button></div>';
   html += '<div style="text-align:center;margin:4px 0 2px;"><h1 style="font-size:28px;margin:0;color:var(--grape-dark);">'+esc(b.name||"보상판")+'</h1>'
-    + '<p class="muted" style="margin:4px 0;">🏆 지금까지 '+earned+'번 달성 · 목표 '+goal+'알</p></div>';
+    + '<p class="muted" style="margin:4px 0;">🏆 지금까지 '+earned+'번 달성 · 목표 '+goal+'알'+(pairs.length?' · 마지막 글 '+timeAgo(latestPostAt(b)):'')+'</p></div>';
   html += '<div class="card cluster-card'+((left<=3&&g>0)?' near':'')+'" id="clusterCard">'
     + '<svg viewBox="0 0 90 42" width="92" height="44" style="display:block;margin:0 auto -8px;" aria-hidden="true"><path d="M45 42 C45 26 44 16 47 8" stroke="#8a5a32" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M47 12 C58 1 76 4 82 12 C73 21 57 21 47 14 Z" fill="#7bd592"/><path d="M45 15 C33 6 16 9 11 17 C20 25 36 24 45 17 Z" fill="#86e3a3"/></svg>'
     + '<div class="cluster" id="cluster"></div>'
@@ -293,18 +301,15 @@ function renderDetail(){
     + '<div class="row"><input type="text" id="linkInput" placeholder="작성한 블로그 글 주소를 붙여넣어 주세요" autocomplete="off" />'
     + '<button data-action="register">등록하고 포도알 받기</button></div>'
     + '<div class="feedback" id="linkFeedback"></div>'
-    + '<div class="hint">같은 글(링크)은 중복으로 인정되지 않아요. 새 글 주소를 넣으면 랜덤으로 <b>1~3알</b>이 떨어져요. 등록 후 <b>'+EXPIRE_DAYS+'일</b>이 지나면 그 포도알은 자동으로 사라져요(0 미만으로는 안 내려가요).</div></div>';
+    + '<div class="hint">같은 글(링크)은 중복으로 인정되지 않아요. 새 글 주소를 넣으면 랜덤으로 <b>1~3알</b>이 떨어져요. 마지막 글 이후 <b>'+DECAY_DAYS+'일</b> 안에 새 글이 없으면 포도알이 <b>1개씩</b> 깎여요(이미 얻은 글은 그대로, 0 미만으로는 안 내려가요).</div></div>';
   html += '<div class="card"><h2>📜 등록한 블로그 주소 ('+pairs.length+')</h2>';
   if(pairs.length===0){ html += '<p class="muted">아직 등록한 글이 없어요.</p>'; }
   else {
     html += pairs.map(function(p){
-      var L=p[1], exp=!!L.expired;
-      var right = exp
-        ? '<span style="color:#b3a6c4;font-family:Jua,sans-serif;white-space:nowrap;"><span style="text-decoration:line-through;">+'+(L.grapes||0)+'알</span> 만료 · '+timeAgo(L.at)+'</span>'
-        : '<span style="color:var(--grape-deep);font-family:Jua,sans-serif;white-space:nowrap;">+'+(L.grapes||0)+'알 · '+timeAgo(L.at)+'</span>';
-      return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:7px 2px;border-bottom:1px dashed #eee;opacity:'+(exp?'.6':'1')+';">'
-        + '<a href="'+esc(L.url)+'" target="_blank" rel="noopener" style="color:var(--grape-deep);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;">'+esc(L.url)+'</a>'
-        + right + '</div>';
+      var L=p[1];
+      return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:7px 2px;border-bottom:1px dashed #eee;">'
+        + '<a href="'+esc(L.url)+'" target="_blank" rel="noopener" style="color:var(--grape-deep);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:64%;">'+esc(L.url)+'</a>'
+        + '<span style="color:var(--grape-deep);font-family:Jua,sans-serif;white-space:nowrap;">+'+(L.grapes||0)+'알 · '+timeAgo(L.at)+'</span></div>';
     }).join("");
   }
   html += '</div>';
@@ -453,7 +458,7 @@ function start(){
   });
   db.ref("boards").on("value", function(snap){
     boards = snap.val() || {};
-    sweepExpired();
+    sweepDecay();
     render();
   }, function(err){
     fatal = err;
@@ -468,7 +473,7 @@ function start(){
   });
 }
 start();
-setInterval(function(){ sweepExpired(); }, 3600000);
+setInterval(function(){ sweepDecay(); }, 3600000);
 </script>
 </body>
 </html>
