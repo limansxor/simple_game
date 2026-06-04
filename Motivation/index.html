@@ -190,6 +190,34 @@ function linkPairs(b){
   return Object.keys(b.links).map(function(k){ return [k, b.links[k]]; })
     .sort(function(a,b2){ return (b2[1].at||0) - (a[1].at||0); });
 }
+// 포도알 변동 원장
+function histPairs(b){
+  if(!b || !b.history) return [];
+  return Object.keys(b.history).map(function(k){ return [k, b.history[k]]; })
+    .sort(function(a,b2){ return (b2[1].at||0) - (a[1].at||0); });
+}
+function histLabel(t){
+  return t==="post"?"글 등록":t==="decay"?"미활동 차감":t==="adjust"?"관리자 조정":t==="restore"?"차감 복구":t==="delete"?"글 삭제":"변동";
+}
+// 원장 도입 전에 등록된 기존 글들을 변동 기록에 소급 등록 (1회만, 중복 방지)
+function backfillHistory(){
+  if(!db) return;
+  Object.keys(boards).forEach(function(id){
+    var b = boards[id]; if(!b || b.histMigrated) return;
+    var existing = {};
+    if(b.history){ Object.keys(b.history).forEach(function(k){ var h=b.history[k]; if(h && h.type==="post" && h.note) existing[h.note]=1; }); }
+    var updates = {};
+    if(b.links){
+      Object.keys(b.links).forEach(function(k){
+        var L = b.links[k]; if(!L || existing[L.url]) return;
+        var hk = db.ref("boards/"+id+"/history").push().key;
+        updates["boards/"+id+"/history/"+hk] = { delta:(L.grapes||0), type:"post", note:(L.url||""), at:(L.at||Date.now()) };
+      });
+    }
+    updates["boards/"+id+"/histMigrated"] = true;
+    db.ref().update(updates);
+  });
+}
 // 마지막 글 시각 (등록된 글 중 최신, 없으면 생성 시각)
 function latestPostAt(b){
   var t = (b && b.lastPostAt) || 0;
@@ -213,6 +241,8 @@ function sweepDecay(){
     if(dec > 0){
       updates["boards/"+id+"/totalGrapes"] = total - dec;
       updates["boards/"+id+"/decayedTotal"] = (b.decayedTotal||0) + dec;
+      var hkey = db.ref("boards/"+id+"/history").push().key;
+      updates["boards/"+id+"/history/"+hkey] = { delta:-dec, type:"decay", at:Date.now() };
     }
     db.ref().update(updates);
   });
@@ -221,7 +251,7 @@ function sweepDecay(){
 /* ===== Firebase 액션 ===== */
 function createBoard(name, goal){
   var r = db.ref("boards").push();
-  return r.set({ name:name, goal:goal, totalGrapes:0, createdAt:Date.now(), lastPostAt:Date.now() });
+  return r.set({ name:name, goal:goal, totalGrapes:0, createdAt:Date.now(), lastPostAt:Date.now(), histMigrated:true });
 }
 function registerLink(id, raw){
   var b = boards[id]; if(!b) return;
@@ -240,6 +270,8 @@ function registerLink(id, raw){
   updates["boards/"+id+"/links/"+key] = { url:String(raw).trim(), canonical:canon, grapes:draw, at:Date.now() };
   updates["boards/"+id+"/totalGrapes"] = newTotal;
   updates["boards/"+id+"/lastPostAt"] = Date.now();
+  var hkey = db.ref("boards/"+id+"/history").push().key;
+  updates["boards/"+id+"/history/"+hkey] = { delta:draw, type:"post", note:String(raw).trim(), at:Date.now() };
   db.ref().update(updates).then(function(){
     var el = document.getElementById("linkInput"); if(el) el.value="";
     setFb(fb,"등록 완료! 포도알 "+draw+"알 획득 🍇","ok");
@@ -310,6 +342,19 @@ function renderDetail(){
       return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:7px 2px;border-bottom:1px dashed #eee;">'
         + '<a href="'+esc(L.url)+'" target="_blank" rel="noopener" style="color:var(--grape-deep);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:64%;">'+esc(L.url)+'</a>'
         + '<span style="color:var(--grape-deep);font-family:Jua,sans-serif;white-space:nowrap;">+'+(L.grapes||0)+'알 · '+timeAgo(L.at)+'</span></div>';
+    }).join("");
+  }
+  html += '</div>';
+
+  var hist = histPairs(b).slice(0,15);
+  html += '<div class="card"><h2>🧾 포도알 변동 기록</h2>';
+  if(hist.length===0){ html += '<p class="muted">아직 변동 기록이 없어요.</p>'; }
+  else {
+    html += hist.map(function(p){
+      var H=p[1], plus=(H.delta||0)>0;
+      return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:6px 2px;border-bottom:1px dashed #eee;">'
+        + '<span>'+histLabel(H.type)+(H.note?' <span style="color:var(--ink-soft);font-size:12px;">'+esc(String(H.note).slice(0,42))+'</span>':'')+'</span>'
+        + '<span style="font-family:Jua,sans-serif;white-space:nowrap;color:'+(plus?'var(--green)':'var(--red)')+';">'+(plus?'+':'')+(H.delta||0)+'알 <span style="color:var(--ink-soft);">· '+timeAgo(H.at)+'</span></span></div>';
     }).join("");
   }
   html += '</div>';
@@ -458,6 +503,7 @@ function start(){
   });
   db.ref("boards").on("value", function(snap){
     boards = snap.val() || {};
+    backfillHistory();
     sweepDecay();
     render();
   }, function(err){

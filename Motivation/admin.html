@@ -101,6 +101,32 @@ function linkPairs(b){
   return Object.keys(b.links).map(function(k){ return [k, b.links[k]]; })
     .sort(function(a,b2){ return (b2[1].at||0) - (a[1].at||0); });
 }
+function histPairs(b){
+  if(!b || !b.history) return [];
+  return Object.keys(b.history).map(function(k){ return [k, b.history[k]]; })
+    .sort(function(a,b2){ return (b2[1].at||0) - (a[1].at||0); });
+}
+function histLabel(t){
+  return t==="post"?"글 등록":t==="decay"?"미활동 차감":t==="adjust"?"관리자 조정":t==="restore"?"차감 복구":t==="delete"?"글 삭제":"변동";
+}
+function backfillHistory(){
+  if(!db) return;
+  Object.keys(boards).forEach(function(id){
+    var b = boards[id]; if(!b || b.histMigrated) return;
+    var existing = {};
+    if(b.history){ Object.keys(b.history).forEach(function(k){ var h=b.history[k]; if(h && h.type==="post" && h.note) existing[h.note]=1; }); }
+    var updates = {};
+    if(b.links){
+      Object.keys(b.links).forEach(function(k){
+        var L = b.links[k]; if(!L || existing[L.url]) return;
+        var hk = db.ref("boards/"+id+"/history").push().key;
+        updates["boards/"+id+"/history/"+hk] = { delta:(L.grapes||0), type:"post", note:(L.url||""), at:(L.at||Date.now()) };
+      });
+    }
+    updates["boards/"+id+"/histMigrated"] = true;
+    db.ref().update(updates);
+  });
+}
 function latestPostAt(b){
   var t = (b && b.lastPostAt) || 0;
   if(b && b.links){ Object.keys(b.links).forEach(function(k){ var a=(b.links[k]&&b.links[k].at)||0; if(a>t) t=a; }); }
@@ -122,6 +148,8 @@ function sweepDecay(){
     if(dec > 0){
       updates["boards/"+id+"/totalGrapes"] = total - dec;
       updates["boards/"+id+"/decayedTotal"] = (b.decayedTotal||0) + dec;
+      var hkey = db.ref("boards/"+id+"/history").push().key;
+      updates["boards/"+id+"/history/"+hkey] = { delta:-dec, type:"decay", at:Date.now() };
     }
     db.ref().update(updates);
   });
@@ -138,6 +166,10 @@ function deleteLink(id, key){
   var updates = {};
   updates["boards/"+id+"/links/"+key] = null;
   updates["boards/"+id+"/totalGrapes"] = newTotal;
+  if(g > 0){
+    var hk = db.ref("boards/"+id+"/history").push().key;
+    updates["boards/"+id+"/history/"+hk] = { delta:-g, type:"delete", note:(b.links[key].url||""), at:Date.now() };
+  }
   db.ref().update(updates);
 }
 function deleteBoard(id){
@@ -149,7 +181,12 @@ function restoreDecayed(id){
   var b = boards[id]; if(!b) return;
   var d = b.decayedTotal||0; if(d<=0) return;
   if(!window.confirm("미활동으로 차감된 포도알 "+d+"개를 모두 복구할까요?")) return;
-  db.ref("boards/"+id).update({ totalGrapes: totalOf(b)+d, decayedTotal: 0 });
+  var hk = db.ref("boards/"+id+"/history").push().key;
+  var u = {};
+  u["boards/"+id+"/totalGrapes"] = totalOf(b)+d;
+  u["boards/"+id+"/decayedTotal"] = 0;
+  u["boards/"+id+"/history/"+hk] = { delta:d, type:"restore", at:Date.now() };
+  db.ref().update(u);
 }
 function adjustGrapes(id){
   var b = boards[id]; if(!b) return;
@@ -159,7 +196,12 @@ function adjustGrapes(id){
   if(isNaN(d) || d===0) return;
   var nt = Math.max(0, totalOf(b)+d);
   if(!window.confirm("누적 포도알을 "+totalOf(b)+" → "+nt+"(으)로 바꿀까요?")) return;
-  db.ref("boards/"+id).update({ totalGrapes: nt });
+  var applied = nt - totalOf(b);
+  var hk = db.ref("boards/"+id+"/history").push().key;
+  var u = {};
+  u["boards/"+id+"/totalGrapes"] = nt;
+  u["boards/"+id+"/history/"+hk] = { delta:applied, type:"adjust", at:Date.now() };
+  db.ref().update(u);
 }
 function editBoard(id){
   var b = boards[id]; if(!b) return;
@@ -231,6 +273,18 @@ function renderData(){
         }).join("");
         s += '</tbody></table>';
       }
+      var hist = histPairs(b).slice(0,12);
+      if(hist.length){
+        s += '<div class="muted" style="margin-top:10px;">🧾 포도알 변동 기록</div>';
+        s += '<table class="links-tbl"><thead><tr><th>변동</th><th>구분</th><th>시각</th></tr></thead><tbody>';
+        s += hist.map(function(p){
+          var H=p[1], plus=(H.delta||0)>0;
+          return '<tr><td class="gv" style="color:'+(plus?'#16a36a':'#e0518a')+';">'+(plus?'+':'')+(H.delta||0)+'</td>'
+            + '<td>'+histLabel(H.type)+(H.note?' <span class="muted" style="font-size:11px;">'+esc(String(H.note).slice(0,36))+'</span>':'')+'</td>'
+            + '<td class="muted">'+timeAgo(H.at)+'</td></tr>';
+        }).join("");
+        s += '</tbody></table>';
+      }
     }
     s += '</div>';
     return s;
@@ -262,6 +316,7 @@ function start(){
   });
   db.ref("boards").on("value", function(snap){
     boards = snap.val() || {};
+    backfillHistory();
     sweepDecay();
     render();
   }, function(err){ fatal = err; render(); });
