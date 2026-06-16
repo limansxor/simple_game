@@ -105,6 +105,21 @@
   .cal-legend{display:flex;gap:16px;justify-content:center;margin-top:12px;font-size:12px;color:var(--ink-soft);}
   .cal-legend span{display:inline-flex;align-items:center;gap:5px;}
 
+  /* 마스코트 */
+  .mascot-wrap{display:flex;flex-direction:column;align-items:center;margin:6px 0 2px;}
+  .speech{background:#fff;border:2px solid #ecdffb;border-radius:16px;padding:8px 15px;font-family:'Jua',sans-serif;color:var(--grape-dark);font-size:15px;box-shadow:var(--shadow-sm);position:relative;margin-bottom:9px;max-width:330px;text-align:center;animation:fadein .3s;}
+  .speech::after{content:"";position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);border:8px solid transparent;border-top-color:#fff;}
+  .mascot{width:96px;height:104px;transform-origin:bottom center;}
+  @keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+  @keyframes mjump{0%{transform:translateY(0) scale(1);}30%{transform:translateY(-22px) scale(1.08);}60%{transform:translateY(0) scale(.97);}100%{transform:translateY(0);}}
+  @keyframes mdance{0%{transform:rotate(-8deg) translateY(0);}25%{transform:rotate(0) translateY(-8px);}50%{transform:rotate(8deg) translateY(0);}75%{transform:rotate(0) translateY(-8px);}100%{transform:rotate(-8deg);}}
+  @keyframes mwilt{0%,100%{transform:rotate(-3deg);}50%{transform:rotate(3deg) translateY(2px);}}
+  .mascot.idle{animation:bob 2.6s ease-in-out infinite;}
+  .mascot.happy{animation:bob 1.5s ease-in-out infinite;}
+  .mascot.cheer{animation:mjump .55s ease-out 3;}
+  .mascot.celebrate{animation:mdance .62s ease-in-out infinite;}
+  .mascot.sad{animation:mwilt 3.2s ease-in-out infinite;}
+
   /* 팝업 */
   .overlay{position:fixed;inset:0;background:rgba(91,74,107,.35);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(2px);}
   .overlay.show{display:flex;animation:fadein .2s;}
@@ -340,6 +355,7 @@ function registerLink(id, raw){
     setFb(fb,"등록 완료! 포도알 "+draw+"알 획득 🍇","ok");
     floatUp("+"+draw+"알");
     showDraw({ n:draw, gainedReward:gainedReward, remaining: goal - (newTotal%goal), earned: Math.floor(newTotal/goal) });
+    setMascot(gainedReward ? "celebrate" : "cheer", 4000); render();
   }).catch(function(err){ setFb(fb,"저장 실패: "+(err.message||err),"bad"); });
 }
 
@@ -382,10 +398,61 @@ function renderList(){
   return html;
 }
 
+/* ===== 마스코트 ===== */
+var mascotMood=null, mascotLine="", mascotLineFor="__", mascotTimer=null;
+var MASCOT_LINES={
+  cheer:["오늘도 한 알 더! 🍇","좋았어, 계속 가자~","역시 최고야 ✨","한 걸음 더 가까워졌어!"],
+  celebrate:["목표 달성!! 같이 춤추자 🎉","해냈다아 🍇🎉","대단해, 보상 받자!"],
+  happy:["방금 글 멋졌어! ☺️","이 기세 그대로!","오늘 컨디션 최고네!"],
+  idle:["오늘 글 한 편 어때?","포도알 채우러 가볼까?","난 네가 글 쓸 때가 제일 좋아 ☺️"],
+  sad:["며칠 조용하네… 글 한 편 쓸까? 🥺","포도알이 시들고 있어…","네가 오면 기운 날 텐데…"]
+};
+function mPick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function setMascot(mood, ms){
+  mascotMood=mood; mascotLine=mPick(MASCOT_LINES[mood]||MASCOT_LINES.idle); mascotLineFor=mood;
+  if(mascotTimer) clearTimeout(mascotTimer);
+  if(ms) mascotTimer=setTimeout(function(){ mascotMood=null; render(); }, ms);
+}
+function computeMood(b){
+  var ms=DECAY_DAYS*24*60*60*1000, since=Date.now()-latestPostAt(b);
+  if(since>=ms) return "sad";
+  if(since<6*3600000) return "happy";
+  return "idle";
+}
+function renderMascot(b){
+  var mood = mascotMood || computeMood(b);
+  if(mood!==mascotLineFor){ mascotLine=mPick(MASCOT_LINES[mood]||MASCOT_LINES.idle); mascotLineFor=mood; }
+  return '<div class="mascot-wrap"><div class="speech">'+esc(mascotLine)+'</div><div class="mascot '+mood+'">'+mascotSVG(mood)+'</div></div>';
+}
+function mascotSVG(mood){
+  var up=(mood==="cheer"||mood==="celebrate"), eyes, mouth, extra="";
+  if(mood==="sad"){
+    eyes='<path d="M34 56 q5 4 10 0" stroke="#46285f" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M52 56 q5 4 10 0" stroke="#46285f" stroke-width="2.4" fill="none" stroke-linecap="round"/>';
+    mouth='<path d="M42 75 q6 -6 12 0" stroke="#46285f" stroke-width="2.4" fill="none" stroke-linecap="round"/>';
+    extra='<path d="M70 49 q3.5 6 0 9.5 q-3.5 -3.5 0 -9.5 Z" fill="#8fd3ff"/>';
+  } else {
+    eyes='<circle cx="39" cy="57" r="4.3" fill="#46285f"/><circle cx="57" cy="57" r="4.3" fill="#46285f"/><circle cx="40.7" cy="55.5" r="1.4" fill="#fff"/><circle cx="58.7" cy="55.5" r="1.4" fill="#fff"/>';
+    if(up){ mouth='<path d="M40 70 q8 12 16 0 q-8 5 -16 0 Z" fill="#7c3a52"/>'; extra='<text x="14" y="34" font-size="14">✨</text><text x="74" y="32" font-size="14">✨</text>'; }
+    else { mouth='<path d="M41 70 q7 7 14 0" stroke="#46285f" stroke-width="2.4" fill="none" stroke-linecap="round"/>'; }
+  }
+  var armL = up ? '<ellipse cx="15" cy="52" rx="5" ry="9" transform="rotate(-35 15 52)" fill="url(#gFill)"/>' : '<ellipse cx="15" cy="66" rx="5" ry="9" fill="url(#gFill)"/>';
+  var armR = up ? '<ellipse cx="81" cy="52" rx="5" ry="9" transform="rotate(35 81 52)" fill="url(#gFill)"/>' : '<ellipse cx="81" cy="66" rx="5" ry="9" fill="url(#gFill)"/>';
+  return '<svg viewBox="0 0 96 104" width="96" height="104">'
+    + '<path d="M48 18 C48 9 50 6 53 3" stroke="#8a5a32" stroke-width="3" fill="none" stroke-linecap="round"/>'
+    + '<path d="M52 9 C62 1 77 4 81 11 C73 18 58 17 52 11 Z" fill="#86e3a3"/>'
+    + armL + armR
+    + '<circle cx="34" cy="33" r="11" fill="url(#gFill)"/><circle cx="62" cy="33" r="11" fill="url(#gFill)"/><circle cx="48" cy="29" r="11" fill="url(#gFill)"/>'
+    + '<ellipse cx="48" cy="63" rx="33" ry="32" fill="url(#gFill)" stroke="rgba(255,255,255,.5)" stroke-width="2"/>'
+    + '<ellipse cx="34" cy="47" rx="7" ry="4.5" fill="rgba(255,255,255,.72)" transform="rotate(-20 34 47)"/>'
+    + '<ellipse cx="30" cy="69" rx="5" ry="3" fill="#ff8fb5" opacity=".5"/><ellipse cx="66" cy="69" rx="5" ry="3" fill="#ff8fb5" opacity=".5"/>'
+    + eyes + mouth + extra + '</svg>';
+}
+
 function renderDetail(){
   var b = boards[currentId], goal=goalOf(b), g=grapesOf(b), earned=earnedOf(b), left=goal-g;
   var pairs = linkPairs(b);
   var html = '<div class="row" style="margin-bottom:6px;"><button class="ghost small" data-action="home">← 목록</button></div>';
+  html += renderMascot(b);
   html += '<div style="text-align:center;margin:4px 0 2px;"><h1 style="font-size:28px;margin:0;color:var(--grape-dark);">'+esc(b.name||"보상판")+'</h1>'
     + '<p class="muted" style="margin:4px 0;">🏆 지금까지 '+earned+'번 달성 · 목표 '+goal+'알'+(pairs.length?' · 마지막 글 '+timeAgo(latestPostAt(b)):'')+'</p></div>';
   html += '<div class="card cluster-card'+((left<=3&&g>0)?' near':'')+'" id="clusterCard">'
