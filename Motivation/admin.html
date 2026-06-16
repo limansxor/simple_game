@@ -135,23 +135,26 @@ function latestPostAt(b){
 // 미활동 패널티: 마지막 글 이후 DECAY_DAYS일이 지날 때마다 포도알 1개 차감. 0 미만 방지.
 function sweepDecay(){
   if(!db) return;
-  var now = Date.now(), ms = DECAY_DAYS*24*60*60*1000;
+  var ms = DECAY_DAYS*24*60*60*1000;
   Object.keys(boards).forEach(function(id){
     var b = boards[id]; if(!b) return;
-    var base = Math.max(latestPostAt(b), b.lastDecayAt||0);
-    var win = Math.floor((now - base)/ms);
-    if(win < 1) return;
-    var total = totalOf(b);
-    var dec = Math.min(win, total);
-    var updates = {};
-    updates["boards/"+id+"/lastDecayAt"] = base + win*ms;
-    if(dec > 0){
-      updates["boards/"+id+"/totalGrapes"] = total - dec;
-      updates["boards/"+id+"/decayedTotal"] = (b.decayedTotal||0) + dec;
-      var hkey = db.ref("boards/"+id+"/history").push().key;
-      updates["boards/"+id+"/history/"+hkey] = { delta:-dec, type:"decay", at:Date.now() };
-    }
-    db.ref().update(updates);
+    if(Date.now() - Math.max(latestPostAt(b), b.lastDecayAt||0) < ms) return;
+    db.ref("boards/"+id).transaction(function(cur){
+      if(!cur) return cur;
+      var cbase = Math.max(latestPostAt(cur), cur.lastDecayAt||0);
+      var win = Math.floor((Date.now()-cbase)/ms);
+      if(win < 1) return;
+      var total = cur.totalGrapes||0;
+      var dec = Math.min(win, total);
+      cur.lastDecayAt = cbase + win*ms;
+      if(dec > 0){
+        cur.totalGrapes = total - dec;
+        cur.decayedTotal = (cur.decayedTotal||0) + dec;
+        cur.history = cur.history || {};
+        cur.history["decay_"+cur.lastDecayAt] = { delta:-dec, type:"decay", at:Date.now() };
+      }
+      return cur;
+    });
   });
 }
 function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
@@ -202,6 +205,10 @@ function adjustGrapes(id){
   u["boards/"+id+"/totalGrapes"] = nt;
   u["boards/"+id+"/history/"+hk] = { delta:applied, type:"adjust", at:Date.now() };
   db.ref().update(u);
+}
+function deleteHist(id, key){
+  if(!window.confirm("이 변동 기록 한 줄을 삭제할까요?\n(로그만 지워지고 포도알 수는 변하지 않아요)")) return;
+  db.ref("boards/"+id+"/history/"+key).remove();
 }
 function editBoard(id){
   var b = boards[id]; if(!b) return;
@@ -276,12 +283,13 @@ function renderData(){
       var hist = histPairs(b).slice(0,12);
       if(hist.length){
         s += '<div class="muted" style="margin-top:10px;">🧾 포도알 변동 기록</div>';
-        s += '<table class="links-tbl"><thead><tr><th>변동</th><th>구분</th><th>시각</th></tr></thead><tbody>';
+        s += '<table class="links-tbl"><thead><tr><th>변동</th><th>구분</th><th>시각</th><th></th></tr></thead><tbody>';
         s += hist.map(function(p){
           var H=p[1], plus=(H.delta||0)>0;
           return '<tr><td class="gv" style="color:'+(plus?'#16a36a':'#e0518a')+';">'+(plus?'+':'')+(H.delta||0)+'</td>'
             + '<td>'+histLabel(H.type)+(H.note?' <span class="muted" style="font-size:11px;">'+esc(String(H.note).slice(0,36))+'</span>':'')+'</td>'
-            + '<td class="muted">'+timeAgo(H.at)+'</td></tr>';
+            + '<td class="muted">'+timeAgo(H.at)+'</td>'
+            + '<td><button class="small ghost" data-action="delhist" data-id="'+id+'" data-key="'+p[0]+'">기록 삭제</button></td></tr>';
         }).join("");
         s += '</tbody></table>';
       }
@@ -302,6 +310,7 @@ document.addEventListener("click", function(e){
   else if(a==="edit"){ editBoard(id); }
   else if(a==="delboard"){ deleteBoard(id); }
   else if(a==="dellink"){ deleteLink(id, t.dataset.key); }
+  else if(a==="delhist"){ deleteHist(id, t.dataset.key); }
 });
 
 /* ===== 시작 ===== */

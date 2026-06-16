@@ -87,6 +87,24 @@
   .floatup{position:absolute;left:50%;top:38%;transform:translateX(-50%);font-family:'Jua',sans-serif;font-size:30px;color:var(--grape-deep);pointer-events:none;animation:floaty 1.1s ease-out forwards;z-index:5;}
   @keyframes floaty{0%{opacity:0;transform:translate(-50%,12px) scale(.7);}20%{opacity:1;}100%{opacity:0;transform:translate(-50%,-52px) scale(1.1);}}
 
+  /* 활동 달력 */
+  .cal-head{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
+  .cal-head .mlabel{font-family:'Jua',sans-serif;font-size:18px;color:var(--grape-dark);min-width:130px;text-align:center;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+  .cal-dow{text-align:center;font-size:12px;color:var(--ink-soft);padding:2px 0;}
+  .cal-dow.sun{color:#e0708f;}
+  .cal-cell{min-height:50px;border-radius:10px;background:#faf7ff;border:1px solid #f0e9fb;padding:3px 5px;}
+  .cal-cell.empty{background:transparent;border:none;}
+  .cal-cell.today{outline:2px solid var(--grape);}
+  .cal-cell .d{font-size:11px;color:var(--ink-soft);}
+  .cal-cell .net{font-family:'Jua',sans-serif;font-size:13px;line-height:1.1;margin-top:1px;}
+  .cal-cell .net.pos{color:var(--green);} .cal-cell .net.neg{color:var(--red);}
+  .cal-dots{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px;}
+  .cal-dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+  .cal-dot.post{background:var(--grape-deep);} .cal-dot.decay{background:var(--red);}
+  .cal-legend{display:flex;gap:16px;justify-content:center;margin-top:12px;font-size:12px;color:var(--ink-soft);}
+  .cal-legend span{display:inline-flex;align-items:center;gap:5px;}
+
   /* 팝업 */
   .overlay{position:fixed;inset:0;background:rgba(91,74,107,.35);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(2px);}
   .overlay.show{display:flex;animation:fadein .2s;}
@@ -154,6 +172,7 @@ var boards = {};
 var view = "list";          // list | detail
 var currentId = null;
 var prevFilled = 0, GROW_ROWS = null, GROW_FOR = -1;
+var calY = null, calM = null;   // 달력에서 보고 있는 연/월(0-based)
 
 /* ===== 순수 로직 ===== */
 var TRACKING = ["utm_source","utm_medium","utm_campaign","utm_term","utm_content","fbclid","gclid","igshid","spm","ref","ref_src","src","cid"];
@@ -199,6 +218,46 @@ function histPairs(b){
 function histLabel(t){
   return t==="post"?"글 등록":t==="decay"?"미활동 차감":t==="adjust"?"관리자 조정":t==="restore"?"차감 복구":t==="delete"?"글 삭제":"변동";
 }
+// 날짜별 활동 집계 (key: "Y-M-D", 로컬 기준)
+function buildCalData(b){
+  var map = {};
+  histPairs(b).forEach(function(p){
+    var H=p[1], d=new Date(H.at||0);
+    var key=d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate();
+    if(!map[key]) map[key]={net:0,post:0,decay:0,other:0};
+    var m=map[key]; m.net += (H.delta||0);
+    if(H.type==="post") m.post++; else if(H.type==="decay") m.decay++; else m.other++;
+  });
+  return map;
+}
+function renderCalendar(b){
+  if(calY===null){ var n=new Date(); calY=n.getFullYear(); calM=n.getMonth(); }
+  var data=buildCalData(b);
+  var startDow=new Date(calY,calM,1).getDay();
+  var days=new Date(calY,calM+1,0).getDate();
+  var t=new Date(), tk=t.getFullYear()+"-"+t.getMonth()+"-"+t.getDate();
+  var dows=["일","월","화","수","목","금","토"];
+  var s='<div class="card"><h2>📅 활동 달력</h2>'
+    + '<div class="cal-head"><button class="ghost small" data-action="calprev">‹</button>'
+    + '<span class="mlabel">'+calY+'년 '+(calM+1)+'월</span>'
+    + '<button class="ghost small" data-action="calnext">›</button></div>';
+  s+='<div class="cal-grid">'+dows.map(function(d,i){return '<div class="cal-dow'+(i===0?' sun':'')+'">'+d+'</div>';}).join("");
+  for(var i=0;i<startDow;i++) s+='<div class="cal-cell empty"></div>';
+  for(var dn=1;dn<=days;dn++){
+    var key=calY+"-"+calM+"-"+dn, m=data[key];
+    s+='<div class="cal-cell'+(key===tk?' today':'')+'"><div class="d">'+dn+'</div>';
+    if(m){
+      if(m.net!==0) s+='<div class="net '+(m.net>0?'pos':'neg')+'">'+(m.net>0?'+':'')+m.net+'</div>';
+      s+='<div class="cal-dots">';
+      for(var j=0;j<Math.min(m.post,4);j++) s+='<span class="cal-dot post"></span>';
+      if(m.decay>0) s+='<span class="cal-dot decay"></span>';
+      s+='</div>';
+    }
+    s+='</div>';
+  }
+  s+='</div><div class="cal-legend"><span><span class="cal-dot post"></span>블로그 글</span><span><span class="cal-dot decay"></span>미활동 차감</span><span class="net pos" style="font-family:Jua">+N</span><span class="net neg" style="font-family:Jua">−N 포도알</span></div></div>';
+  return s;
+}
 // 원장 도입 전에 등록된 기존 글들을 변동 기록에 소급 등록 (1회만, 중복 방지)
 function backfillHistory(){
   if(!db) return;
@@ -226,25 +285,29 @@ function latestPostAt(b){
 }
 // 미활동 패널티: 마지막 글 이후 DECAY_DAYS일이 지날 때마다 포도알 1개 차감. 0 미만 방지.
 // 이미 얻은 글의 포도알은 건드리지 않음. 새 글을 올리면 시계가 리셋됨.
+// 트랜잭션 + 결정적 키로 동시 실행 중복 방지
 function sweepDecay(){
   if(!db) return;
-  var now = Date.now(), ms = DECAY_DAYS*24*60*60*1000;
+  var ms = DECAY_DAYS*24*60*60*1000;
   Object.keys(boards).forEach(function(id){
     var b = boards[id]; if(!b) return;
-    var base = Math.max(latestPostAt(b), b.lastDecayAt||0);
-    var win = Math.floor((now - base)/ms);
-    if(win < 1) return;
-    var total = totalOf(b);
-    var dec = Math.min(win, total);   // 0 미만 방지
-    var updates = {};
-    updates["boards/"+id+"/lastDecayAt"] = base + win*ms;   // 차감 시계 전진(중복 차감 방지)
-    if(dec > 0){
-      updates["boards/"+id+"/totalGrapes"] = total - dec;
-      updates["boards/"+id+"/decayedTotal"] = (b.decayedTotal||0) + dec;
-      var hkey = db.ref("boards/"+id+"/history").push().key;
-      updates["boards/"+id+"/history/"+hkey] = { delta:-dec, type:"decay", at:Date.now() };
-    }
-    db.ref().update(updates);
+    if(Date.now() - Math.max(latestPostAt(b), b.lastDecayAt||0) < ms) return; // 빠른 스킵
+    db.ref("boards/"+id).transaction(function(cur){
+      if(!cur) return cur;
+      var cbase = Math.max(latestPostAt(cur), cur.lastDecayAt||0);
+      var win = Math.floor((Date.now()-cbase)/ms);
+      if(win < 1) return;                 // 이미 처리됨 → 중단(중복 방지)
+      var total = cur.totalGrapes||0;
+      var dec = Math.min(win, total);
+      cur.lastDecayAt = cbase + win*ms;
+      if(dec > 0){
+        cur.totalGrapes = total - dec;
+        cur.decayedTotal = (cur.decayedTotal||0) + dec;
+        cur.history = cur.history || {};
+        cur.history["decay_"+cur.lastDecayAt] = { delta:-dec, type:"decay", at:Date.now() };  // 창마다 고정 키
+      }
+      return cur;
+    });
   });
 }
 
@@ -334,6 +397,8 @@ function renderDetail(){
     + '<button data-action="register">등록하고 포도알 받기</button></div>'
     + '<div class="feedback" id="linkFeedback"></div>'
     + '<div class="hint">같은 글(링크)은 중복으로 인정되지 않아요. 새 글 주소를 넣으면 랜덤으로 <b>1~3알</b>이 떨어져요. 마지막 글 이후 <b>'+DECAY_DAYS+'일</b> 안에 새 글이 없으면 포도알이 <b>1개씩</b> 깎여요(이미 얻은 글은 그대로, 0 미만으로는 안 내려가요).</div></div>';
+  html += renderCalendar(b);
+
   html += '<div class="card"><h2>📜 등록한 블로그 주소 ('+pairs.length+')</h2>';
   if(pairs.length===0){ html += '<p class="muted">아직 등록한 글이 없어요.</p>'; }
   else {
@@ -474,7 +539,9 @@ document.addEventListener("click", function(e){
   var t = e.target.closest("[data-action]"); if(!t) return;
   var a = t.dataset.action, id = t.dataset.id;
   if(a==="home"){ view="list"; currentId=null; render(); }
-  else if(a==="open"){ currentId=id; view="detail"; prevFilled=0; render(); }
+  else if(a==="open"){ currentId=id; view="detail"; prevFilled=0; calY=null; calM=null; render(); }
+  else if(a==="calprev"){ calM--; if(calM<0){ calM=11; calY--; } render(); }
+  else if(a==="calnext"){ calM++; if(calM>11){ calM=0; calY++; } render(); }
   else if(a==="create"){ doCreate(); }
   else if(a==="register"){ registerLink(currentId, (document.getElementById("linkInput")||{}).value||""); }
 });
