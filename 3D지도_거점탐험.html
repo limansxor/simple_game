@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>스페인·포르투갈 3D 거점 지도 · 임문택 ♥ 장지연</title>
+<style>
+  :root{--madrid:#e0563f;--sevilla:#f0a030;--bcn:#3f8fd0;--porto:#3fb3a0;--lisbon:#f2c64b;}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0c1620;
+    font-family:"Apple SD Gothic Neo","Pretendard","Noto Sans KR",system-ui,sans-serif;color:#eef3f7}
+  #app{position:fixed;inset:0}
+  canvas{display:block;touch-action:none}
+  .topbar{position:fixed;top:0;left:0;right:0;padding:16px 20px;z-index:10;pointer-events:none;
+    background:linear-gradient(#0c1620cc,transparent)}
+  .topbar h1{margin:0;font-size:16px;font-weight:800;letter-spacing:-.01em}
+  .topbar .sub{font-size:11.5px;color:#8aa0b0;margin-top:2px}
+  .hint{position:fixed;bottom:14px;left:0;right:0;text-align:center;z-index:10;pointer-events:none;
+    font-size:11.5px;color:#7e95a6}
+  .hint b{color:#bcd0de}
+  /* 운행 시각 HUD */
+  #hud{position:fixed;left:16px;bottom:16px;z-index:10;background:#0a141ed9;border:1px solid #25394a;
+    border-radius:12px;padding:11px 13px;backdrop-filter:blur(7px);box-shadow:0 10px 30px #0007}
+  #hud.hide{display:none}
+  #hud .hh{font-size:10px;letter-spacing:.14em;color:#7e95a6;text-transform:uppercase;margin-bottom:8px;
+    display:flex;justify-content:space-between;gap:18px}
+  #hud .hh b{color:#f0c451;font-weight:700}
+  #hud .hl{display:flex;align-items:center;gap:9px;padding:3px 0;color:#cfdded;font-size:12px}
+  #hud .hm{width:16px;text-align:center;font-size:13px}
+  #hud .hd{color:#7e95a6;width:30px;font-variant-numeric:tabular-nums}
+  #hud .hr{flex:1;font-size:11.5px;color:#9fb4c4;white-space:nowrap}
+  #hud .ht{font-family:ui-monospace,Menlo,monospace;color:#7ddf8a;font-size:11.5px}
+  #hud .ht b{color:#52708a;font-weight:400;margin:0 2px}
+  .legend{position:fixed;top:16px;right:16px;z-index:10;display:flex;flex-direction:column;gap:5px;
+    background:#13212e99;border:1px solid #25394a;border-radius:10px;padding:9px 11px;backdrop-filter:blur(6px)}
+  .legend .it{display:flex;align-items:center;gap:7px;font-size:11.5px;color:#c4d4e0;cursor:pointer}
+  .legend .dot{width:9px;height:9px;border-radius:50%}
+
+  #popup{position:fixed;left:50%;bottom:46px;transform:translateX(-50%) translateY(20px);
+    width:min(420px,calc(100vw - 32px));z-index:20;opacity:0;pointer-events:none;transition:.28s}
+  #popup.on{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+  .card{background:#0f1c27f2;border:1px solid var(--c,#3f8fd0);border-radius:16px;
+    box-shadow:0 18px 50px #000a,0 0 0 1px #ffffff0a inset;overflow:hidden;backdrop-filter:blur(10px)}
+  .card .top{display:flex;align-items:center;gap:11px;padding:15px 18px 11px}
+  .chip{width:30px;height:30px;border-radius:8px;flex:0 0 auto;display:flex;align-items:center;
+    justify-content:center;font-weight:800;font-size:14px;color:#0c1620;background:var(--c)}
+  .card .nm{font-size:17px;font-weight:800;line-height:1.1}
+  .card .nm small{display:block;font-size:10.5px;color:#8aa0b0;font-weight:500;letter-spacing:.08em;margin-top:2px}
+  .card .x{margin-left:auto;cursor:pointer;color:#7e95a6;font-size:18px;line-height:1;padding:2px 4px}
+  .card .x:hover{color:#fff}
+  .body{padding:4px 18px 16px}
+  .lyrtitle{font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--c);text-transform:uppercase;margin-bottom:6px}
+  .lyrtext{font-size:14px;line-height:1.7;color:#e6eef4;min-height:74px}
+  .nav{display:flex;align-items:center;gap:12px;margin-top:10px}
+  .arw{width:36px;height:36px;border-radius:50%;border:1px solid #2b4256;background:transparent;
+    color:#cfe0ec;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;flex:0 0 auto}
+  .arw:hover{background:var(--c);color:#0c1620;border-color:var(--c)}
+  .dots{display:flex;gap:7px;margin:0 auto}
+  .dots .d{width:8px;height:8px;border-radius:50%;background:#2b4256;transition:.2s}
+  .dots .d.on{background:var(--c);transform:scale(1.25)}
+  .depth{font-size:10.5px;color:#7e95a6;letter-spacing:.04em;text-align:center;margin-top:8px}
+  .detailbtn{display:block;width:100%;margin-top:11px;padding:10px;border-radius:10px;border:none;cursor:pointer;
+    background:var(--c);color:#0c1620;font-weight:800;font-size:13px;font-family:inherit}
+  .detailbtn.dim{background:#22323f;color:#6f8597;cursor:default}
+
+  /* detail mode UI */
+  #backbtn{position:fixed;top:16px;left:16px;z-index:15;display:none;cursor:pointer;
+    background:#13212ecc;border:1px solid #2b4256;border-radius:10px;padding:9px 14px;font-size:13px;
+    font-weight:700;color:#dce8f0;backdrop-filter:blur(6px)}
+  #backbtn:hover{border-color:#5a7488}
+  #dcap{position:fixed;left:50%;bottom:54px;transform:translateX(-50%);z-index:15;display:none;
+    width:min(440px,calc(100vw - 32px));text-align:center;background:#0f1c27dd;border:1px solid #2b4256;
+    border-radius:12px;padding:11px 16px;backdrop-filter:blur(8px)}
+  #dcap .t{font-size:13.5px;font-weight:800;color:#fff}
+  #dcap .s{font-size:12px;color:#9fb4c4;margin-top:3px;line-height:1.6}
+  #dlegend{position:fixed;top:16px;right:16px;z-index:15;display:none;flex-direction:column;gap:6px;
+    background:#13212ecc;border:1px solid #25394a;border-radius:10px;padding:10px 12px;backdrop-filter:blur(6px);font-size:11.5px;color:#c4d4e0}
+  #dlegend .r{display:flex;gap:8px;align-items:center}
+  #dlegend .e{font-size:14px;width:18px;text-align:center}
+  .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0c1620;z-index:50;color:#8aa0b0;font-size:13px}
+  /* 세부 오브젝트 사진 팝업 */
+  #dphoto{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;
+    background:#06101899;backdrop-filter:blur(4px)}
+  #dphoto.on{display:flex}
+  #dphoto .pcard{width:min(560px,calc(100vw - 32px));background:#0f1c27;border:1px solid #2b4256;
+    border-radius:16px;overflow:hidden;box-shadow:0 24px 70px #000b;position:relative}
+  #dphoto .pclose{position:absolute;top:10px;right:12px;z-index:2;cursor:pointer;color:#fff;
+    background:#0008;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
+  #dphoto .pwrap{width:100%;aspect-ratio:16/10;background:#16242f;display:flex;align-items:center;justify-content:center;color:#5e7488}
+  #dphoto img{width:100%;height:100%;object-fit:cover;display:block}
+  #dphoto .ph{font-size:12.5px;color:#7e95a6;padding:18px}
+  #dphoto .pinfo{padding:14px 18px 18px}
+  #dphoto .pt{font-size:18px;font-weight:800}
+  #dphoto .ps{font-size:13.5px;color:#9fb4c4;margin-top:5px;line-height:1.6}
+  #dphoto .pwrap{position:relative}
+  #dphoto .pnav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;
+    border-radius:50%;background:#000a;color:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:22px;cursor:pointer;z-index:3;user-select:none}
+  #dphoto .pnav:hover{background:#000d}
+  #dphoto .pnav.prev{left:10px} #dphoto .pnav.next{right:10px}
+  #dphoto .pcount{position:absolute;bottom:10px;right:12px;z-index:3;background:#000a;color:#fff;
+    font-size:11.5px;padding:3px 9px;border-radius:999px}
+  /* 겹친 오브젝트 선택 메뉴 */
+  #dpickmenu{position:fixed;z-index:30;display:none;background:#0f1c27f5;border:1px solid #2b4256;
+    border-radius:12px;padding:8px;backdrop-filter:blur(8px);box-shadow:0 14px 40px #000a;min-width:184px}
+  #dpickmenu .hh{font-size:10.5px;letter-spacing:.06em;color:#7e95a6;text-transform:uppercase;padding:4px 8px 7px}
+  #dpickmenu .pm{font-size:13.5px;color:#dce8f0;padding:9px 11px;border-radius:8px;cursor:pointer}
+  #dpickmenu .pm:hover{background:#1d3346}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="topbar"><h1 id="title">스페인 · 포르투갈 — 거점 3D 지도</h1>
+  <div class="sub" id="subtitle">임문택 ♥ 장지연 · 체스 말 = 숙박 등급(1박 졸→3박 퀸) · ✈ 마드리드 입국 · 바르셀로나→포르투 · 리스본 출국</div></div>
+
+<div class="legend" id="legend"></div>
+
+<div id="popup"><div class="card" id="card">
+  <div class="top"><div class="chip" id="p-chip">1</div>
+    <div class="nm" id="p-name">—<small id="p-en"></small></div>
+    <div class="x" id="p-close">✕</div></div>
+  <div class="body">
+    <div class="lyrtitle" id="p-ltitle">개요</div>
+    <div class="lyrtext" id="p-ltext"></div>
+    <div class="nav"><div class="arw" id="p-prev">‹</div><div class="dots" id="p-dots"></div><div class="arw" id="p-next">›</div></div>
+    <div class="depth" id="p-depth"></div>
+    <button class="detailbtn" id="p-detail">🔍 세부 3D 장면 보기</button>
+  </div>
+</div></div>
+
+<div id="backbtn">← 거점 지도로</div>
+<div id="dlegend">
+  <div class="r"><span class="e">✈️</span>공항 (비행기 착륙)</div>
+  <div class="r"><span class="e">🏨</span>호텔 · 숙소</div>
+  <div class="r"><span class="e">🚉</span>역 (야자수=정원)</div>
+  <div class="r"><span class="e">⛲</span>분수 광장</div>
+  <div class="r"><span class="e">🌳</span>공원</div>
+  <div class="r"><span class="e">🎟️</span>입장권 필요(흔들)</div>
+  <div class="r"><span class="e">📷</span>포토스팟</div>
+  <div class="r"><span class="e">🖼️</span>사진 빌보드</div>
+  <div class="r"><span class="e" style="color:#fff">➡️</span>도보 동선</div>
+  <div class="r"><span class="e" style="color:#ffce6a">➡️</span>공항 픽업</div>
+</div>
+<div id="dcap"><div class="t" id="dcap-t"></div><div class="s" id="dcap-s"></div></div>
+
+<div id="dphoto"><div class="pcard">
+  <div class="pclose" id="dphoto-x">✕</div>
+  <div class="pwrap">
+    <div class="ph" id="dphoto-ph">사진 불러오는 중…</div>
+    <img id="dphoto-img" alt="" style="display:none">
+    <div class="pnav prev" id="dphoto-prev">‹</div>
+    <div class="pnav next" id="dphoto-next">›</div>
+    <div class="pcount" id="dphoto-count"></div>
+  </div>
+  <div class="pinfo"><div class="pt" id="dphoto-t"></div><div class="ps" id="dphoto-s"></div></div>
+</div></div>
+
+<div class="hint" id="hint"><b>드래그</b> 좌우 회전 · <b>말 클릭</b> 거점 정보 · <b>◀ ▶</b> 점점 깊은 정보</div>
+<div id="dpickmenu"></div>
+<div class="loading" id="loading">3D 지도를 불러오는 중…</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="window.__threeFail=1"></script>
+<script>
+// 실제 사진 URL (생성 이미지 아님) — 순서대로 시도, 하나라도 되면 표시
+const MADRID_IMG=[
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Plaza_Mayor_de_Madrid_06.jpg/1280px-Plaza_Mayor_de_Madrid_06.jpg',
+  'https://commons.wikimedia.org/wiki/Special:FilePath/Plaza_Mayor_de_Madrid_06.jpg?width=1280',
+  'https://upload.wikimedia.org/wikipedia/commons/4/44/Plaza_Mayor_de_Madrid_06.jpg'
+];
+
+const CITIES=[
+  { key:'madrid',name:'마드리드',en:'MADRID',lon:-3.70,lat:40.42,hex:0xe0563f,css:'#e0563f',order:1,detail:true,
+    layers:[
+      {t:'거점 ① · 1박',d:'6/28 도착, 여행의 시작점. KE913로 인천에서 마드리드 직항.'},
+      {t:'감성',d:'긴 비행 끝, 밤 9시 반까지 환한 첫 저녁. 도착장 문을 나서며 “우리 정말 왔구나”.'},
+      {t:'디테일',d:'라파엘오텔레스 아토차 · 첫 솅겐 입국 EES 생체등록 · 픽업 18:40 (WhatsApp).'},
+      {t:'추천',d:'레티로 공원 산책 + 산타아나 광장 첫 타파스(헤밍웨이 노포).'},
+      {t:'그 시기',d:'프라이드(MADO) 주간 — 아토차·추에카가 들떠 있어요.'}]},
+  { key:'sevilla',name:'세비야',en:'SEVILLA',lon:-5.99,lat:37.39,hex:0xf0a030,css:'#f0a030',order:2,detail:true,
+    layers:[
+      {t:'거점 ② · 2박',d:'6/29~30. AVE 고속열차로 남부로(2시간 40분).'},
+      {t:'감성',d:'오렌지 향 골목과 타일의 도시. 스페인광장의 거대한 반원.'},
+      {t:'디테일',d:'워킹투어 08:30 황금의탑 · 한낮 35~40도 · 물·이어폰 필수.'},
+      {t:'추천',d:'산타크루즈 옛 유대인 골목에서 일부러 길 잃기.'}]},
+  { key:'bcn',name:'바르셀로나',en:'BARCELONA',lon:2.17,lat:41.39,hex:0x3f8fd0,css:'#3f8fd0',order:3,detail:true,
+    layers:[
+      {t:'거점 ③ · 3박',d:'7/1~3. 최장 체류 거점. AVE로 6시간.'},
+      {t:'감성',d:'가우디가 자라난 도시. 사그라다를 목 아프게 올려다보기.'},
+      {t:'디테일',d:'가우디 투어·스냅촬영 · 바르셀로나카드 4일권 · 소매치기 1순위.'},
+      {t:'추천',d:'엘 본·피카소 미술관 + 벙커스 델 카르멜 일몰.'},
+      {t:'그 시기',d:'그렉 페스티벌 + 여름세일 7/1 시작.'}]},
+  { key:'porto',name:'포르투',en:'PORTO',lon:-8.61,lat:41.15,hex:0x3fb3a0,css:'#3fb3a0',order:4,detail:true,
+    layers:[
+      {t:'거점 ④ · 2박',d:'7/4~5. Vueling로 포르투갈로(1시간).'},
+      {t:'감성',d:'낡고 따뜻한 도시. 도루강 노을이 도시를 주황으로.'},
+      {t:'디테일',d:'반나절 투어 15:00 · 언덕·돌바닥 · 포트와인 20%.'},
+      {t:'추천',d:'가이아 셀러 + 렐루서점·볼량시장.'}]},
+  { key:'lisbon',name:'리스본',en:'LISBOA',lon:-9.14,lat:38.72,hex:0xf2c64b,css:'#f2c64b',order:5,detail:true,
+    layers:[
+      {t:'거점 ⑤ · 2박',d:'7/6~7. FlixBus로 마지막 도시. 7/8 22:15 귀국.'},
+      {t:'감성',d:'7개 언덕의 파스텔 도시. 알파마 파두, 마지막 야경.'},
+      {t:'디테일',d:'시내·야경투어 · 리스보아 카드 48h · 7/8 짐보관 후 픽업.'},
+      {t:'추천',d:'벨렝(제로니무스·에그타르트) + 타임아웃 마켓.'}]},
+];
+
+// 숙박일수 → 체스 말 등급 (1박 졸 / 2박 비숍 / 3박 퀸)
+const NIGHTS={madrid:1,sevilla:2,bcn:3,porto:2,lisbon:2};
+// 위키미디어 실제 사진 경로 (Special:FilePath = 파일명만으로 실제 이미지로 연결)
+const FP='https://commons.wikimedia.org/wiki/Special:FilePath/';
+// 거점별 도착/출발 시각 (체스말 위 시각표)
+const TIMES={
+  madrid:{a:'6/28 18:00',d:'6/29 13:00',date:'2026-06-28',typ:'☀️ 평년 34°/19°'},
+  sevilla:{a:'6/29 15:39',d:'7/1 08:37',date:'2026-06-29',typ:'☀️ 평년 36°/20°'},
+  bcn:{a:'7/1 14:54',d:'7/4 15:10',date:'2026-07-01',typ:'⛅ 평년 28°/21°'},
+  porto:{a:'7/4 16:10',d:'7/6 11:30',date:'2026-07-04',typ:'⛅ 평년 25°/16°'},
+  lisbon:{a:'7/6 14:45',d:'7/8 22:15',date:'2026-07-06',typ:'☀️ 평년 28°/18°'},
+};
+
+// 세부 장면 요소 (도시별)
+const DETAILS={
+ madrid:{
+  geo:{c:[40.4165,-3.7000],z:14}, arrItem:0,
+  mood:{t:'마드리드 — 첫 도시, 첫 밤',s:'바라하스 공항에 착륙 → 픽업으로 아토차 호텔로. 시벨레스 분수와 레티로 산책으로 여행이 시작돼요.'},
+  arrive:{mode:'plane'},
+  items:[
+    {type:'airport',pos:[24,-22],label:'바라하스 공항',sub:'KE913 도착 18:00 · 픽업이 호텔로(도심 북동 ~13km)',photos:[FP+'Madrid_Barajas_Terminal_4S.jpg?width=900',FP+'Adolfo_Suárez_Madrid–Barajas_Airport_(4)_(16843979161).jpg?width=900',FP+'Adolfo_Suárez_Madrid–Barajas_Airport_(7)_(16819319636).jpg?width=900']},
+    {type:'station',g:[40.4066,-3.6903],palms:true,label:'아토차역 식물원',sub:'유리 지붕 아래 야자수 7천 그루가 자라는 열대 식물원(이튿날 세비야행 열차)',photos:[FP+'Invernadero_de_Atocha,_Madrid_-_view_2.JPG?width=900',FP+'Interior_of_Atocha_railway_station.jpg?width=900',FP+'Estación_de_Atocha_(Madrid)_06.jpg?width=900']},
+    {type:'building',g:[40.3975,-3.6770],label:'라파엘 아토차 호텔',sub:'신혼여행 첫 밤을 보내는 곳 · 아토차역 바로 옆 4성급',photos:['https://www.rafaelhoteles.com/idb/68075/LOBBY_RESTAURANTE_9M2A7705_V1_R__1200x800-1200x800.jpg','https://www.rafaelhoteles.com/idb/68075/RH_ATOCHA_terraza_jardin_12-480x320.jpg','https://www.rafaelhoteles.com/idb/68075/LOBBY_9M2A7739_V1_R-760x350.jpg']},
+    {type:'camera',g:[40.4144,-3.7009],label:'산타아나 광장',sub:'첫 타파스 · 포토스팟',photos:[FP+'Plaza_de_Santa_Ana.JPG?width=900',FP+'Night_scene_in_Plaza_de_Santa_Ana,_Madrid.JPG?width=900',FP+'Teatro_Español_at_night,_Plaza_de_Santa_Ana,_Madrid.JPG?width=900']},
+    {type:'fountain',g:[40.4192,-3.6936],label:'시벨레스 분수',sub:'마드리드의 상징, 사자 마차의 여신',photos:[FP+'Fuente_de_Cibeles_(Madrid)_03.jpg?width=900',FP+'Cibeles-Madrid_(2010).JPG?width=900']},
+    {type:'ticket',g:[40.4139,-3.6922],label:'프라도 미술관',sub:'세계적 미술관 — 입장권 필요',photos:[FP+'Museo_del_Prado_(Madrid)_04.jpg?width=900',FP+'Museo_del_Prado.jpg?width=900']},
+    {type:'park',g:[40.4152,-3.6830],label:'레티로 공원',sub:'해 긴 저녁, 호숫가 산책 (수정궁 Palacio de Cristal)',photos:[FP+'Palacio_de_Cristal,_Retiro,_Madrid.jpg?width=900',FP+'Monumento_Alfonso_XII,_parque_del_Retiro.JPG?width=900',FP+'(Sunset)_Parque_de_El_Retiro_-_Madrid.JPG?width=900']},
+    {type:'billboard',pos:[-7,-24],label:'마드리드',img:MADRID_IMG,sub:'플라사 마요르',photos:[FP+'Plaza_Mayor_de_Madrid_06.jpg?width=900',FP+'Plaza_Mayor_de_Madrid_02.jpg?width=900',FP+'Plaza_Mayor_de_Madrid_-_01.jpg?width=900']},
+  ],
+  route:[2,3,4,5,6], pickup:[0,2]
+ },
+ sevilla:{
+  geo:{c:[37.3850,-5.9920],z:14}, arrItem:0,
+  mood:{t:'세비야 — 오렌지 향과 타일',s:'기차로 도착해 황금의 탑에서 워킹투어 시작. 스페인광장의 반원, 대성당 히랄다, 산타크루즈 골목.'},
+  arrive:{mode:'train'},
+  items:[
+    {type:'station',g:[37.3920,-5.9755],label:'산타후스타역',sub:'마드리드에서 AVE로 세비야 도착'},
+    {type:'tower',g:[37.3826,-5.9963],color:0xd9c08a,label:'황금의 탑',sub:'과달키비르 강가 12각 탑 · 워킹투어 미팅 08:30',photos:[FP+'Sevilla_Torre_del_oro.JPG?width=900',FP+'La_Torre_del_Oro,_Sevilla.jpg?width=900',FP+'Torre_del_Oro,_Guadalquivir,_Sevilla.jpg?width=900']},
+    {type:'camera',g:[37.3855,-5.9905],label:'산타크루즈 골목',sub:'오렌지 향 미로 · 포토스팟'},
+    {type:'fountain',g:[37.3774,-5.9870],label:'스페인광장',sub:'48개 주 타일·운하·분수의 반원 광장',photos:[FP+'Plaza_de_España,_Sevilla.jpg?width=900',FP+'Plaza_de_Espana_Seville_Spain.JPG?width=900',FP+'Monumental_Plaza_de_España_de_Sevilla.jpg?width=900']},
+    {type:'tower',g:[37.3861,-5.9932],color:0xc8a86a,label:'대성당·히랄다',sub:'104m 종탑(옛 미나레트)',photos:[FP+'Cathedral_with_Giralda_Tower_-_Seville_-_Spain.jpg?width=900',FP+'Sevilla_Cathedral_And_Giralda_Tower_(25573987).jpeg?width=900']},
+    {type:'billboard',pos:[-9,-23],label:'세비야',img:['https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Monumental_Plaza_de_Espa%C3%B1a_de_Sevilla.jpg/1280px-Monumental_Plaza_de_Espa%C3%B1a_de_Sevilla.jpg'],sub:'스페인광장',photos:[FP+'Monumental_Plaza_de_España_de_Sevilla.jpg?width=900',FP+'Plaza_de_España,_Sevilla.jpg?width=900']},
+  ],
+  route:[1,2,4,3]
+ },
+ bcn:{
+  geo:{c:[41.3960,-2.1620],z:14}, arrItem:0,
+  mood:{t:'바르셀로나 — 가우디의 도시',s:'기차로 도착. 가우디 투어로 카사 바트요·구엘공원·사그라다 파밀리아, 그리고 벙커 일몰.'},
+  arrive:{mode:'train'},
+  items:[
+    {type:'station',g:[41.3790,-2.1402],label:'산츠역',sub:'세비야에서 AVE로 바르셀로나 도착'},
+    {type:'landmark',g:[41.3917,-2.1649],color:0x6fbf9f,label:'카사 바트요',sub:'가우디의 곡선·타일 외관(외부 관람)',photos:[FP+'Casa_Batllo_Overview_Barcelona_Spain.jpg?width=900',FP+'Casa_Batlló_01.jpg?width=900']},
+    {type:'spires',g:[41.4036,-2.1744],color:0xb98a3a,label:'사그라다 파밀리아',sub:'140년째 짓는 성당(외부 관람) · 내부는 별도 예매',photos:[FP+'Sagrada_Familia_(Barcelona).JPG?width=900',FP+'La_Sagrada_Familia_Barcelona.jpg?width=900',FP+'Sagrada_Familia,_Barcelona_(31985705036).jpg?width=900']},
+    {type:'ticket',g:[41.4034,-2.1740],label:'사그라다 입장권',sub:'내부 입장은 14~15시 이후 티켓 별도 예매'},
+    {type:'park',g:[41.4145,-2.1527],label:'구엘공원',sub:'모자이크 도마뱀·도시 전망(입장료 현금)',photos:[FP+'Park_Güell_Barcelona.jpg?width=900',FP+'Barcelona_Parc_Güell_el_drac.jpg?width=900',FP+'Park_Güell_Barcelona_city_view.JPG?width=900']},
+    {type:'camera',g:[41.4196,-2.1423],label:'벙커스 델 카르멜',sub:'360도 일몰 전망 · 스냅 촬영(7/3)'},
+    {type:'billboard',pos:[-9,-23],label:'바르셀로나',img:['https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/La_Sagrada_Familia_Barcelona.jpg/1280px-La_Sagrada_Familia_Barcelona.jpg'],sub:'사그라다 파밀리아',photos:[FP+'Sagrada_Familia_(Barcelona).JPG?width=900',FP+'La_Sagrada_Familia_Barcelona.jpg?width=900']},
+  ],
+  route:[1,2,4,5]
+ },
+ porto:{
+  geo:{c:[41.1455,-8.6120],z:14}, arrItem:0,
+  mood:{t:'포르투 — 낡고 따뜻한 강의 도시',s:'비행기로 도착. 반나절 투어로 렐루·클레리구스·상벤투·히베이라·동 루이스 다리. 가이아 포트와인.'},
+  arrive:{mode:'plane'},
+  items:[
+    {type:'airport',pos:[24,-22],label:'포르투 공항',sub:'Vueling로 바르셀로나에서 도착 · 픽업이 호텔로(도심 북서 ~11km)'},
+    {type:'landmark',g:[41.1466,-8.6149],color:0xc9b070,label:'렐루 서점',sub:'세계에서 가장 아름다운 서점(예매 필수)'},
+    {type:'tower',g:[41.1456,-8.6138],color:0xb89a64,label:'클레리구스 탑',sub:'75m 바로크 탑',photos:[FP+'Torre_de_los_Clérigos,_Oporto,_Portugal,_2012-05-09,_DD_01.JPG?width=900']},
+    {type:'station',g:[41.1457,-8.6107],label:'상 벤투 역',sub:'2만 장 아줄레주(파란 타일)로 덮인 역'},
+    {type:'bridge',g:[41.1403,-8.6092],label:'동 루이스 다리',sub:'에펠 제자가 설계한 2층 철교 · 히베이라 강변',photos:[FP+'Ponte_D_Luis_e_ribeira_do_Porto.JPG?width=900',FP+'Douro_river_cruise,_Porto,_Portugal.JPG?width=900',FP+'Cais_da_Ribeira_e_Ponte_Luís_I_from_Gaia_(2).JPG?width=900']},
+    {type:'wine',g:[41.1375,-8.6110],color:0x7a3b3b,label:'가이아 와이너리',sub:'강 건너 포트와인 셀러(테이스팅)'},
+    {type:'billboard',pos:[-7,-23],label:'포르투',img:['https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Ponte_D_Luis_e_ribeira_do_Porto.JPG/1280px-Ponte_D_Luis_e_ribeira_do_Porto.JPG'],sub:'히베이라 강변',photos:[FP+'Ponte_D_Luis_e_ribeira_do_Porto.JPG?width=900',FP+'Douro_river_cruise,_Porto,_Portugal.JPG?width=900']},
+  ],
+  route:[1,2,3,4]
+ },
+ lisbon:{
+  geo:{c:[38.7220,-9.1500],z:13}, arrItem:0, depItem:1,
+  mood:{t:'리스본 — 7개 언덕의 파스텔 도시',s:'버스로 도착. 알파마·전망대·대성당·코메르시우 광장, 그리고 벨렝(제로니무스 수도원·벨렝 탑).'},
+  arrive:{mode:'bus'},
+  items:[
+    {type:'station',g:[38.7680,-9.0990],label:'오리엔트역',sub:'포르투에서 FlixBus로 리스본 도착'},
+    {type:'airport',pos:[22,-24],label:'리스본 공항',sub:'KE922 22:15 출발 → 인천 7/9 19:15 귀국'},
+    {type:'camera',g:[38.7120,-9.1300],label:'알파마',sub:'빨래 널린 골목·파두 · 전망대 야경',photos:[FP+'Alfama_Lisboa.JPG?width=900',FP+'View_of_the_Alfama_quarter_in_Lisbon_Portugal.JPG?width=900']},
+    {type:'fountain',g:[38.7077,-9.1366],label:'코메르시우 광장',sub:'강을 향해 활짝 열린 광장'},
+    {type:'landmark',g:[38.6979,-9.2065],color:0xd8cba0,label:'제로니무스 수도원',sub:'마누엘 양식의 회랑(리스보아 카드 무료입장)',photos:[FP+'Mosteiro_dos_Jerónimos_-_Lisboa_-_Portugal_(22464320423).jpg?width=900',FP+'Lisboa_-_Mosteiro_dos_Jerónimos_-_Portal_Sul.jpg?width=900']},
+    {type:'tower',g:[38.6916,-9.2160],color:0xcdbf99,label:'벨렝 탑',sub:'테주 강가의 요새 탑',photos:[FP+'Torre_de_Belém,_Lisboa,_Portugal,_2012-05-12,_DD_01.JPG?width=900',FP+'Belem_Tower,_Lisbon,_Portugal.JPG?width=900']},
+    {type:'ticket',g:[38.6925,-9.2155],label:'벨렝 입장권',sub:'리스보아 카드로 무료입장(48h)'},
+    {type:'billboard',pos:[-3,-24],label:'리스본',img:['https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Belem_Tower%2C_Lisbon%2C_Portugal.JPG/1280px-Belem_Tower%2C_Lisbon%2C_Portugal.JPG'],sub:'벨렝 탑',photos:[FP+'Torre_de_Belém,_Lisboa,_Portugal,_2012-05-12,_DD_01.JPG?width=900',FP+'Belem_Tower,_Lisbon,_Portugal.JPG?width=900']},
+  ],
+  route:[0,2,3,4,5]
+ }
+};
+
+// 좌표 변환
+const LON_MIN=-10.2,LON_MAX=4.2,LAT_MIN=35.3,LAT_MAX=44.2;
+const LON_C=(LON_MIN+LON_MAX)/2,LAT_C=(LAT_MIN+LAT_MAX)/2;
+const COSLAT=Math.cos(LAT_C*Math.PI/180),S=13;
+const PW=(LON_MAX-LON_MIN)*COSLAT*S,PD=(LAT_MAX-LAT_MIN)*S;
+function geoToWorld(lon,lat){return{x:(lon-LON_C)*COSLAT*S,z:-(lat-LAT_C)*S};}
+function qbez(p0,p1,p2,t){const u=1-t;return new THREE.Vector3(u*u*p0.x+2*u*t*p1.x+t*t*p2.x,u*u*p0.y+2*u*t*p1.y+t*t*p2.y,u*u*p0.z+2*u*t*p1.z+t*t*p2.z);}
+// Web Mercator: 위경도 → 타일좌표 (실제 지도 정렬용)
+function lon2tx(lon,z){return (lon+180)/360*Math.pow(2,z);}
+function lat2ty(lat,z){const r=lat*Math.PI/180;return (1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*Math.pow(2,z);}
+// 정규화 Mercator (0~1) — 바운딩박스 자동맞춤용
+function mlon(lon){return (lon+180)/360;}
+function mlat(lat){const r=lat*Math.PI/180;return (1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2;}
+const IBERIA=[[-8.9,43.7],[-7.6,43.8],[-5.8,43.6],[-3.8,43.5],[-1.8,43.4],[-1.4,43.3],[0.7,42.7],[2.2,42.4],[3.3,42.3],[1.0,41.1],[0.0,40.0],[-0.3,39.5],[-0.2,38.8],[-0.6,38.2],[-1.0,37.6],[-1.9,37.2],[-2.9,36.7],[-4.4,36.7],[-5.4,36.1],[-6.3,36.3],[-7.0,37.0],[-7.4,37.2],[-8.0,37.1],[-8.9,37.0],[-8.8,38.0],[-9.1,38.7],[-8.8,39.4],[-8.9,40.2],[-8.7,41.1],[-8.8,41.9],[-9.0,43.0],[-8.9,43.7]];
+// 스페인-포르투갈 국경 (포르투갈 동쪽 경계, 북 미뉴강 ~ 남 과디아나강)
+const BORDER=[[-8.88,41.92],[-8.2,42.02],[-6.95,41.03],[-6.78,40.23],[-7.02,39.66],[-7.34,39.47],[-7.0,38.9],[-7.27,38.45],[-7.0,38.02],[-7.44,37.38],[-7.4,37.18]];
+const CW=1024,CH=Math.round(CW*PD/PW);
+function geoToCanvas(lon,lat){return{x:(lon-LON_MIN)/(LON_MAX-LON_MIN)*CW,y:(LAT_MAX-lat)/(LAT_MAX-LAT_MIN)*CH};}
+function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+
+function buildMapTexture(){
+  const cv=document.createElement('canvas');cv.width=CW;cv.height=CH;const g=cv.getContext('2d');
+  const sea=g.createLinearGradient(0,0,0,CH);sea.addColorStop(0,'#13435f');sea.addColorStop(1,'#0d2c40');
+  g.fillStyle=sea;g.fillRect(0,0,CW,CH);
+  g.strokeStyle='#ffffff10';g.lineWidth=1;
+  for(let lo=-10;lo<=4;lo+=2){const a=geoToCanvas(lo,LAT_MIN),b=geoToCanvas(lo,LAT_MAX);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();}
+  for(let la=36;la<=44;la+=2){const a=geoToCanvas(LON_MIN,la),b=geoToCanvas(LON_MAX,la);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();}
+  g.beginPath();IBERIA.forEach((p,i)=>{const c=geoToCanvas(p[0],p[1]);i?g.lineTo(c.x,c.y):g.moveTo(c.x,c.y);});g.closePath();
+  const land=g.createLinearGradient(0,0,CW,CH);land.addColorStop(0,'#caa86e');land.addColorStop(.5,'#d9bd86');land.addColorStop(1,'#c69f63');
+  g.fillStyle=land;g.shadowColor='#00000055';g.shadowBlur=24;g.fill();g.shadowBlur=0;g.strokeStyle='#8a6b3e';g.lineWidth=2.5;g.stroke();
+  // 국경선 (스페인 / 포르투갈)
+  g.strokeStyle='#6e4a22';g.lineWidth=3.5;g.setLineDash([8,6]);g.beginPath();
+  BORDER.forEach((p,i)=>{const c=geoToCanvas(p[0],p[1]);i?g.lineTo(c.x,c.y):g.moveTo(c.x,c.y);});g.stroke();g.setLineDash([]);
+  g.fillStyle='#5a3f1e88';g.font='bold 30px sans-serif';g.textAlign='center';
+  const es=geoToCanvas(-1.6,41.6);g.fillText('ESPAÑA',es.x,es.y);
+  const pt=geoToCanvas(-8.25,39.9);g.save();g.translate(pt.x,pt.y);g.rotate(-Math.PI/2);g.fillText('PORTUGAL',0,0);g.restore();
+  // 바다 이름 (서쪽=대서양, 남동쪽=지중해)
+  g.fillStyle='#bfe0efcc';g.font='italic bold 25px sans-serif';g.textAlign='center';
+  const atl=geoToCanvas(-9.92,40.9);g.save();g.translate(atl.x,atl.y);g.rotate(-Math.PI/2);g.fillText('대서양  ATLANTIC',0,0);g.restore();
+  const med=geoToCanvas(1.9,38.6);g.save();g.translate(med.x,med.y);g.rotate(-0.32);g.fillText('지중해  MEDITERRANEAN',0,0);g.restore();
+  g.strokeStyle='#ffffffcc';g.lineWidth=3;g.setLineDash([10,8]);g.beginPath();
+  CITIES.forEach((c,i)=>{const p=geoToCanvas(c.lon,c.lat);i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y);});g.stroke();g.setLineDash([]);
+  CITIES.forEach(c=>{const p=geoToCanvas(c.lon,c.lat);g.fillStyle='#0c1620cc';g.font='bold 22px sans-serif';g.textAlign='left';
+    const w=g.measureText(c.name).width;g.fillRect(p.x+10,p.y-12,w+12,26);g.fillStyle='#fff';g.fillText(c.name,p.x+16,p.y+6);});
+  return new THREE.CanvasTexture(cv);
+}
+
+// ---- Three 기본 ----
+let scene,camera,renderer,raycaster,pointer;
+let mapG,detailG=null,pawns=[],planes=[];
+let mode='map',rotY=0.35,elev=0.82,idle=true,curDist=235,tgtX=0,tgtZ=0;
+const DIST_MAP=235,DIST_DETAIL=98;
+let billboards=[],arrows=[],fountains=[],bobbers=[],dVehicles=[],dPick=[];
+
+function init(){
+  scene=new THREE.Scene();scene.background=new THREE.Color(0x0c1620);
+  scene.fog=new THREE.Fog(0x0c1620,320,700);
+  camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0.1,3000);
+  renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+  document.getElementById('app').appendChild(renderer.domElement);
+  scene.add(new THREE.AmbientLight(0xffffff,0.62));
+  const key=new THREE.DirectionalLight(0xfff0dd,0.95);key.position.set(-60,140,60);scene.add(key);
+  const fill=new THREE.DirectionalLight(0x88bbff,0.35);fill.position.set(80,60,-40);scene.add(fill);
+
+  mapG=new THREE.Group();scene.add(mapG);
+  const tex=buildMapTexture();tex.anisotropy=8;
+  const map=new THREE.Mesh(new THREE.PlaneGeometry(PW,PD),new THREE.MeshStandardMaterial({map:tex,roughness:.95}));
+  map.rotation.x=-Math.PI/2;mapG.add(map);
+  const slab=new THREE.Mesh(new THREE.BoxGeometry(PW,6,PD),new THREE.MeshStandardMaterial({color:0x2a3947,roughness:1}));
+  slab.position.y=-3.2;mapG.add(slab);
+
+  CITIES.forEach(c=>{
+    const w=geoToWorld(c.lon,c.lat);
+    const g=makePiece(NIGHTS[c.key]||1,c.hex);
+    g.position.set(w.x,0,w.z);g.userData.city=c;g.userData.base=0;mapG.add(g);pawns.push(g);
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(4.6,32),new THREE.MeshBasicMaterial({color:c.hex,transparent:true,opacity:.45}));
+    disc.rotation.x=-Math.PI/2;disc.position.set(w.x,.3,w.z);mapG.add(disc);
+    // 체스말 위 도착/출발 시각표 + 현지 날씨
+    const tag=makeTimeTag(c);
+    tag.position.set(w.x,{1:15,2:18,3:21}[NIGHTS[c.key]||1],w.z);mapG.add(tag);
+    fetchWeather(c,tag);
+  });
+
+  // 입국 비행기 (마드리드), 출국 비행기 (리스본)
+  const mad=geoToWorld(-3.70,40.42), lis=geoToWorld(-9.14,38.72);
+  const arrival=makeAirplane(0xe0563f);arrival.userData.kind='arrival';
+  arrival.userData.path=t=>{const e=new THREE.Vector3(mad.x,9,mad.z),s=new THREE.Vector3(mad.x-70,78,mad.z-86);return s.lerp(e,t);};
+  mapG.add(arrival);planes.push(arrival);
+  const dep=makeAirplane(0xf2c64b);dep.userData.kind='departure';
+  dep.userData.path=t=>{const s=new THREE.Vector3(lis.x,9,lis.z),e=new THREE.Vector3(lis.x-66,82,lis.z-92);return s.lerp(e,t);};
+  mapG.add(dep);planes.push(dep);
+  // 바르셀로나 → 포르투 (Vueling, 7/4) — 아치형 비행
+  const bcn=geoToWorld(2.17,41.39), por=geoToWorld(-8.61,41.15);
+  const hop=makeAirplane(0x9fd0e0);hop.userData.kind='hop';hop.userData.p=0.0;
+  hop.userData.path=t=>qbez(new THREE.Vector3(bcn.x,9,bcn.z),new THREE.Vector3((bcn.x+por.x)/2,56,(bcn.z+por.z)/2-8),new THREE.Vector3(por.x,9,por.z),t);
+  mapG.add(hop);planes.push(hop);
+  // 마드리드 → 세비야 기차 (AVE, 6/29) — 지면 위 주행
+  const sev=geoToWorld(-5.99,37.39);
+  const train=makeTrain(0xc2ccd4);train.userData.kind='train';
+  train.userData.path=t=>new THREE.Vector3(mad.x,1.2,mad.z).lerp(new THREE.Vector3(sev.x,1.2,sev.z),t);
+  mapG.add(train);planes.push(train);
+  // 포르투 → 리스본 버스 (FlixBus, 7/6) — 지면 위 주행
+  const bus=makeBus(0xe0a030);bus.userData.kind='bus';
+  bus.userData.path=t=>new THREE.Vector3(por.x,1.2,por.z).lerp(new THREE.Vector3(lis.x,1.2,lis.z),t);
+  mapG.add(bus);planes.push(bus);
+  // 세비야 → 바르셀로나 기차 (AVE, 7/1)
+  const train2=makeTrain(0xc2ccd4);train2.userData.kind='train';
+  train2.userData.path=t=>new THREE.Vector3(sev.x,1.2,sev.z).lerp(new THREE.Vector3(bcn.x,1.2,bcn.z),t);
+  mapG.add(train2);planes.push(train2);
+  // 각 탈것의 진행 방향을 생성 시점에 시작점→목표점으로 한 번 고정
+  planes.forEach(pl=>{pl.userData.fixedDir=pathDirFlat(pl.userData.path);pl.userData.spd=16*0.016/pathLen(pl.userData.path);});
+
+  raycaster=new THREE.Raycaster();pointer=new THREE.Vector2();
+  updateCamera();document.getElementById('loading').style.display='none';
+  bindEvents();buildLegend();animate();
+}
+
+const PIECE_PROFILES={
+  1:[[0,0],[2.9,0],[2.9,.7],[1.7,1.1],[2.1,1.6],[1.0,2.1],[.95,4.3],[1.85,4.8],[1.15,5.2],[.7,5.7],[1.7,6.3],[1.85,7.1],[1.5,7.9],[0,8.7]],
+  2:[[0,0],[3.1,0],[3.1,.8],[1.8,1.3],[2.2,1.9],[1.0,2.5],[.9,7.2],[1.95,7.8],[1.1,8.3],[.7,9.0],[1.6,9.8],[1.15,10.6],[.6,11.2],[1.05,11.6],[0,12.3]],
+  3:[[0,0],[3.4,0],[3.4,.9],[2.0,1.4],[2.4,2.0],[1.1,2.7],[.95,9.6],[2.05,10.3],[1.2,10.9],[.8,11.7],[1.7,12.3],[1.45,12.9],[1.6,13.3],[0,13.5]]
+};
+function makePiece(nights,color){
+  const prof=(PIECE_PROFILES[nights]||PIECE_PROFILES[1]).map(p=>new THREE.Vector2(p[0],p[1]));
+  const mat=new THREE.MeshStandardMaterial({color,roughness:.32,metalness:.3,emissive:new THREE.Color(color),emissiveIntensity:0});
+  const g=new THREE.Group();g.add(new THREE.Mesh(new THREE.LatheGeometry(prof,44),mat));
+  if(nights>=3){ // 퀸: 왕관
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.7,.34,8,22),mat);ring.rotation.x=Math.PI/2;ring.position.y=13.8;g.add(ring);
+    for(let i=0;i<7;i++){const a=i/7*Math.PI*2;const sp=new THREE.Mesh(new THREE.SphereGeometry(.55,10,10),mat);sp.position.set(Math.cos(a)*1.7,14.5,Math.sin(a)*1.7);g.add(sp);}
+  } else if(nights>=2){ // 비숍: 머리 위 작은 구
+    const ball=new THREE.Mesh(new THREE.SphereGeometry(.85,14,14),mat);ball.position.y=12.7;g.add(ball);
+  }
+  g.userData={mats:[mat]};return g;
+}
+function makeTrain(color){
+  const g=new THREE.Group();
+  const body=new THREE.MeshStandardMaterial({color,roughness:.4,metalness:.35});
+  const win=new THREE.MeshStandardMaterial({color:0x1b2733,emissive:0x3a5673,emissiveIntensity:.35});
+  for(let k=0;k<2;k++){
+    const car=new THREE.Mesh(new THREE.BoxGeometry(2.6,2.4,5.6),body);car.position.set(0,1.4,-k*6+2.9);g.add(car);
+    const w=new THREE.Mesh(new THREE.BoxGeometry(2.7,0.75,4.8),win);w.position.set(0,1.85,-k*6+2.9);g.add(w);
+  }
+  const nose=new THREE.Mesh(new THREE.BoxGeometry(2.5,2.1,1.6),body);nose.position.set(0,1.35,6.2);g.add(nose);
+  g.userData.p=Math.random();return g;
+}
+function makeBus(color){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.BoxGeometry(2.8,2.8,6.2),new THREE.MeshStandardMaterial({color,roughness:.5,metalness:.2}));body.position.y=1.7;g.add(body);
+  const win=new THREE.Mesh(new THREE.BoxGeometry(2.9,0.95,5.2),new THREE.MeshStandardMaterial({color:0x16222e,emissive:0x2a4a66,emissiveIntensity:.35}));win.position.y=2.2;g.add(win);
+  const front=new THREE.Mesh(new THREE.BoxGeometry(2.7,1.5,0.3),new THREE.MeshStandardMaterial({color:0x8fb4d8,transparent:true,opacity:.6}));front.position.set(0,2.0,3.2);g.add(front);
+  g.userData.p=Math.random();return g;
+}
+// 체스말 위 도착/출발 시각표 + 날씨 (스프라이트)
+function makeTimeTag(city){
+  const T=TIMES[city.key]||{a:'-',d:'-'};
+  const cv=document.createElement('canvas');cv.width=340;cv.height=190;const c=cv.getContext('2d');
+  const tex=new THREE.CanvasTexture(cv);
+  function draw(weather){
+    c.clearRect(0,0,340,190);
+    roundRect(c,4,4,332,182,18);c.fillStyle='#0a141ef2';c.fill();c.lineWidth=3;c.strokeStyle=city.css;c.stroke();
+    c.textAlign='left';
+    c.fillStyle=city.css;c.font='bold 27px sans-serif';c.fillText(city.order+' · '+city.name,22,40);
+    c.fillStyle='#7ddf8a';c.font='bold 22px sans-serif';c.fillText('▼ 도착',22,80);
+    c.fillStyle='#eef3f7';c.font='22px ui-monospace,monospace';c.fillText(T.a,128,80);
+    c.fillStyle='#f0c451';c.font='bold 22px sans-serif';c.fillText('▲ 출발',22,114);
+    c.fillStyle='#eef3f7';c.font='22px ui-monospace,monospace';c.fillText(T.d,128,114);
+    c.fillStyle='#8fd0ff';c.font='bold 22px sans-serif';c.fillText('날씨',22,156);
+    c.fillStyle='#eef3f7';c.font='24px sans-serif';c.fillText(weather||'불러오는 중…',92,156);
+    tex.needsUpdate=true;
+  }
+  draw(null);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+  sp.scale.set(22.5,12.6,1);sp.userData.draw=draw;return sp;
+}
+function wxIcon(c){if(c===0)return'☀️';if(c<=3)return'⛅';if(c<=48)return'🌫️';if(c<=67)return'🌧️';if(c<=77)return'❄️';if(c<=82)return'🌦️';return'⛈️';}
+function fetchWeather(city,tag){
+  const T=TIMES[city.key];if(!T||!T.date){tag.userData.draw(T?T.typ:'-');return;}
+  const url='https://api.open-meteo.com/v1/forecast?latitude='+city.lat+'&longitude='+city.lon+'&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&start_date='+T.date+'&end_date='+T.date;
+  fetch(url).then(r=>r.json()).then(j=>{
+    const dd=j&&j.daily;const hi=dd&&dd.temperature_2m_max&&dd.temperature_2m_max[0];
+    if(hi==null){tag.userData.draw(T.typ);return;}
+    tag.userData.draw(wxIcon(dd.weather_code[0])+' '+Math.round(hi)+'° / '+Math.round(dd.temperature_2m_min[0])+'°');
+  }).catch(()=>tag.userData.draw(T.typ));
+}
+function makeAirplane(color){
+  const g=new THREE.Group();const white=new THREE.MeshStandardMaterial({color:0xf2f4f7,roughness:.4,metalness:.3});
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,8,16),white);body.rotation.x=Math.PI/2;g.add(body);
+  const nose=new THREE.Mesh(new THREE.ConeGeometry(.9,2,16),white);nose.rotation.x=Math.PI/2;nose.position.z=5;g.add(nose);
+  const tc=new THREE.Mesh(new THREE.ConeGeometry(.9,1.6,16),white);tc.rotation.x=-Math.PI/2;tc.position.z=-4.8;g.add(tc);
+  const cm=new THREE.MeshStandardMaterial({color});
+  const wing=new THREE.Mesh(new THREE.BoxGeometry(13,.25,2.4),cm);wing.position.z=.4;g.add(wing);
+  const tail=new THREE.Mesh(new THREE.BoxGeometry(5,.22,1.6),cm);tail.position.z=-4.2;g.add(tail);
+  const fin=new THREE.Mesh(new THREE.BoxGeometry(.22,2.2,1.8),cm);fin.position.set(0,1,-4.2);g.add(fin);
+  g.scale.set(1.15,1.15,1.15);g.userData.p=Math.random();return g;
+}
+
+function updateCamera(){elev=Math.max(0.35,Math.min(1.42,elev));camera.position.set(tgtX,curDist*Math.sin(elev),tgtZ+curDist*Math.cos(elev));camera.lookAt(tgtX,0,tgtZ);}
+
+// ---- 세부 장면 빌더 ----
+function makeLabel(text,bg){
+  const cv=document.createElement('canvas');cv.width=256;cv.height=64;const c=cv.getContext('2d');
+  c.fillStyle=bg||'#0c1620dd';roundRect(c,2,2,252,60,16);c.fill();
+  c.strokeStyle='#ffffff33';c.lineWidth=2;c.stroke();
+  c.fillStyle='#fff';c.font='bold 28px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(text,128,34);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthTest:false}));
+  sp.scale.set(5.25,1.3,1);return sp;
+}
+function makeBuilding(color){
+  const g=new THREE.Group();
+  const b=new THREE.Mesh(new THREE.BoxGeometry(9,14,9),new THREE.MeshStandardMaterial({color,roughness:.7}));b.position.y=7;g.add(b);
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(10,1.2,10),new THREE.MeshStandardMaterial({color:0x8a4b2a}));roof.position.y=14.6;g.add(roof);
+  // 창문
+  const wm=new THREE.MeshStandardMaterial({color:0xffe6a0,emissive:0xffcf6b,emissiveIntensity:.5});
+  for(let y=3;y<=12;y+=3)for(let x=-2.6;x<=2.6;x+=2.6){const w=new THREE.Mesh(new THREE.BoxGeometry(1.4,1.8,.2),wm);w.position.set(x,y,4.55);g.add(w);}
+  return g;
+}
+function makeStation(palms){
+  const g=new THREE.Group();
+  const hall=new THREE.Mesh(new THREE.BoxGeometry(16,9,12),new THREE.MeshStandardMaterial({color:0x9a3b32,roughness:.8}));hall.position.y=4.5;g.add(hall);
+  const glass=new THREE.Mesh(new THREE.CylinderGeometry(7,7,12,24,1,true,0,Math.PI),new THREE.MeshStandardMaterial({color:0x9fd4e6,transparent:true,opacity:.5,side:THREE.DoubleSide,metalness:.3}));
+  glass.rotation.z=Math.PI/2;glass.rotation.y=Math.PI/2;glass.position.y=9;g.add(glass);
+  if(palms){ // 아토차 식물원 야자수
+    for(let i=0;i<3;i++){const px=-4+i*4;
+      const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.4,.6,7,8),new THREE.MeshStandardMaterial({color:0x7a5a35}));trunk.position.set(px,3.5,2);g.add(trunk);
+      for(let k=0;k<6;k++){const leaf=new THREE.Mesh(new THREE.ConeGeometry(.7,4,5),new THREE.MeshStandardMaterial({color:0x3fae4f}));
+        leaf.position.set(px,7,2);leaf.rotation.z=Math.cos(k/6*6.28)*.9;leaf.rotation.x=Math.sin(k/6*6.28)*.9;g.add(leaf);}
+    }
+  }
+  return g;
+}
+function makeTower(color){
+  const g=new THREE.Group();const m=new THREE.MeshStandardMaterial({color:color||0xcdbf99,roughness:.6});
+  const base=new THREE.Mesh(new THREE.BoxGeometry(4.2,11,4.2),m);base.position.y=5.5;g.add(base);
+  const mid=new THREE.Mesh(new THREE.BoxGeometry(3.2,4,3.2),m);mid.position.y=13;g.add(mid);
+  const spire=new THREE.Mesh(new THREE.ConeGeometry(2.3,5,4),new THREE.MeshStandardMaterial({color:0xd8c98a,roughness:.5,metalness:.2}));spire.position.y=17.5;g.add(spire);
+  return g;
+}
+function makeSpires(color){
+  const g=new THREE.Group();const m=new THREE.MeshStandardMaterial({color:0xcfc09a,roughness:.7});
+  const cm=new THREE.MeshStandardMaterial({color:color||0xb98a3a});
+  [[0,0,18],[-2.6,1,15],[2.6,-1,15],[1.6,2.6,13],[-1.6,-2.6,13]].forEach(p=>{
+    const c=new THREE.Mesh(new THREE.ConeGeometry(1.3,p[2],8),m);c.position.set(p[0],p[2]/2,p[1]);g.add(c);
+    const b=new THREE.Mesh(new THREE.SphereGeometry(.6,8,8),cm);b.position.set(p[0],p[2],p[1]);g.add(b);
+  });
+  return g;
+}
+function makeBridge(color){
+  const g=new THREE.Group();const m=new THREE.MeshStandardMaterial({color:color||0x9aa6ad,metalness:.55,roughness:.4});
+  const deck=new THREE.Mesh(new THREE.BoxGeometry(18,0.7,3.4),m);deck.position.y=7;g.add(deck);
+  const arch=new THREE.Mesh(new THREE.TorusGeometry(8.5,0.5,8,30,Math.PI),m);arch.position.set(0,0,0);g.add(arch);
+  [-8,8].forEach(x=>{const p=new THREE.Mesh(new THREE.BoxGeometry(0.6,7,0.6),m);p.position.set(x,3.5,0);g.add(p);});
+  const deck2=new THREE.Mesh(new THREE.BoxGeometry(13,0.6,3),m);deck2.position.y=2.5;g.add(deck2);
+  return g;
+}
+function makeFountain(){
+  const g=new THREE.Group();
+  const plaza=new THREE.Mesh(new THREE.CylinderGeometry(9,9,.6,40),new THREE.MeshStandardMaterial({color:0xcdb88e}));plaza.position.y=.3;g.add(plaza);
+  const basin=new THREE.Mesh(new THREE.CylinderGeometry(5.5,5.8,1.6,40),new THREE.MeshStandardMaterial({color:0x9aa6ad,roughness:.6}));basin.position.y=1.2;g.add(basin);
+  const water=new THREE.Mesh(new THREE.CylinderGeometry(5,5,.3,40),new THREE.MeshStandardMaterial({color:0x49b6d8,transparent:true,opacity:.85,metalness:.4,roughness:.2}));water.position.y=1.9;g.add(water);
+  const col=new THREE.Mesh(new THREE.CylinderGeometry(.7,1,3,16),new THREE.MeshStandardMaterial({color:0x9aa6ad}));col.position.y=3.2;g.add(col);
+  const bowl=new THREE.Mesh(new THREE.CylinderGeometry(2.4,1,.8,24),new THREE.MeshStandardMaterial({color:0x9aa6ad}));bowl.position.y=4.6;g.add(bowl);
+  // 물줄기 파티클
+  const N=120,pos=new Float32Array(N*3),vel=[];
+  for(let i=0;i<N;i++){pos[i*3]=0;pos[i*3+1]=5;pos[i*3+2]=0;vel.push({a:Math.random()*6.28,s:.6+Math.random()*.7,v:1.2+Math.random()*1.4,y:Math.random()*2});}
+  const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const pts=new THREE.Points(pg,new THREE.PointsMaterial({color:0xbfeaff,size:.5,transparent:true,opacity:.9}));g.add(pts);
+  g.userData.water={pts,vel,N};
+  fountains.push(g);return g;
+}
+function makePark(){
+  const g=new THREE.Group();
+  const ground=new THREE.Mesh(new THREE.CylinderGeometry(11,11,.6,36),new THREE.MeshStandardMaterial({color:0x4e8f4a}));ground.position.y=.3;g.add(ground);
+  const lake=new THREE.Mesh(new THREE.CylinderGeometry(4,4,.3,32),new THREE.MeshStandardMaterial({color:0x3f86b8,metalness:.4,roughness:.2}));lake.position.set(3,.65,-2);g.add(lake);
+  for(let i=0;i<7;i++){const a=i/7*6.28,r=6+Math.random()*3;
+    const tr=new THREE.Mesh(new THREE.CylinderGeometry(.4,.5,2.5,7),new THREE.MeshStandardMaterial({color:0x6b4a2c}));tr.position.set(Math.cos(a)*r,1.5,Math.sin(a)*r);g.add(tr);
+    const cr=new THREE.Mesh(new THREE.SphereGeometry(2,10,10),new THREE.MeshStandardMaterial({color:0x3f9a47}));cr.position.set(Math.cos(a)*r,3.6,Math.sin(a)*r);g.add(cr);}
+  return g;
+}
+function makeTicket(){
+  const g=new THREE.Group();
+  const cv=document.createElement('canvas');cv.width=200;cv.height=120;const c=cv.getContext('2d');
+  c.fillStyle='#f4c542';roundRect(c,4,4,192,112,14);c.fill();
+  c.strokeStyle='#9a6b00';c.setLineDash([7,6]);c.lineWidth=3;c.beginPath();c.moveTo(140,8);c.lineTo(140,112);c.stroke();c.setLineDash([]);
+  c.fillStyle='#5a3d00';c.font='bold 26px sans-serif';c.textAlign='center';c.fillText('입장권',74,56);c.font='bold 18px sans-serif';c.fillText('TICKET',74,82);
+  c.font='22px sans-serif';c.fillText('🎟',168,68);
+  const tex=new THREE.CanvasTexture(cv);
+  const t=new THREE.Mesh(new THREE.PlaneGeometry(5,3),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide,transparent:true}));
+  t.position.y=6;g.add(t);g.userData.bob=true;g.userData.base=6;bobbers.push(g);return g;
+}
+function makeCamera(){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.BoxGeometry(4,2.6,2.2),new THREE.MeshStandardMaterial({color:0x2b2f36,roughness:.5}));body.position.y=4;g.add(body);
+  const lens=new THREE.Mesh(new THREE.CylinderGeometry(1,1.1,1.4,20),new THREE.MeshStandardMaterial({color:0x111417,metalness:.6,roughness:.3}));lens.rotation.x=Math.PI/2;lens.position.set(0,4,1.5);g.add(lens);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1,.18,8,20),new THREE.MeshStandardMaterial({color:0xe0563f}));ring.position.set(0,4,2.2);g.add(ring);
+  const flash=new THREE.Mesh(new THREE.BoxGeometry(1.2,.8,.4),new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:.6}));flash.position.set(-1,5.6,.8);g.add(flash);
+  g.position.y=0;g.userData.spin=true;return g;
+}
+function makeBillboard(url,label){
+  const g=new THREE.Group();
+  const cv=document.createElement('canvas');cv.width=512;cv.height=288;const c=cv.getContext('2d');
+  const gr=c.createLinearGradient(0,0,0,288);gr.addColorStop(0,'#26384a');gr.addColorStop(1,'#16242f');c.fillStyle=gr;c.fillRect(0,0,512,288);
+  c.fillStyle='#cfe0ec';c.font='44px sans-serif';c.textAlign='center';c.fillText('🖼',256,128);
+  c.font='bold 26px sans-serif';c.fillStyle='#eef3f7';c.fillText(label,256,176);
+  c.font='16px sans-serif';c.fillStyle='#9fb4c4';c.fillText('사진 불러오는 중…',256,206);
+  c.strokeStyle='#5a7488';c.lineWidth=4;c.setLineDash([14,10]);c.strokeRect(10,10,492,268);c.setLineDash([]);
+  const mat=new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv),side:THREE.DoubleSide});
+  const w=30,h=16.9;const panel=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);panel.position.y=h/2+9;g.add(panel);
+  const frame=new THREE.Mesh(new THREE.PlaneGeometry(w+1.4,h+1.4),new THREE.MeshBasicMaterial({color:0x12202c,side:THREE.DoubleSide}));frame.position.set(0,h/2+9,-0.1);g.add(frame);
+  const pm=new THREE.MeshStandardMaterial({color:0x3a444d});
+  [-w/2+2,w/2-2].forEach(x=>{const p=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,9,8),pm);p.position.set(x,4.5,0);g.add(p);});
+  const list=Array.isArray(url)?url.slice():[url];
+  const loader=new THREE.TextureLoader();loader.setCrossOrigin('anonymous');
+  (function tryNext(){if(!list.length)return;const u=list.shift();loader.load(u,t=>{mat.map=t;mat.needsUpdate=true;},undefined,()=>tryNext());})();
+  g.userData.billboard=true;billboards.push(g);return g;
+}
+function makeArrowFlow(pts,colA,colB){
+  colA=(colA!==undefined)?colA:0x18d6c2; colB=(colB!==undefined)?colB:0x0b7d74;
+  const matA=new THREE.MeshStandardMaterial({color:colA,emissive:colA,emissiveIntensity:.7,roughness:.4});
+  const matB=new THREE.MeshStandardMaterial({color:colB,emissive:colB,emissiveIntensity:.7,roughness:.4});
+  const g=new THREE.Group();const path=pts.map(p=>new THREE.Vector3(p[0],1.7,p[1]));
+  function at(t){const seg=(path.length-1)*t;const i=Math.min(Math.floor(seg),path.length-2);const f=seg-i;return path[i].clone().lerp(path[i+1],f);}
+  // 현재 구간의 고정 방향(구간 시작점→끝점)
+  function segDir(t){const n=path.length-1;const i=Math.min(Math.floor(n*t),n-1);return path[i+1].clone().sub(path[i]).normalize();}
+  const COUNT=Math.max(8,(path.length-1)*6);const chevs=[];
+  const geo=new THREE.ConeGeometry(0.7,1.5,4);
+  for(let i=0;i<COUNT;i++){const m=new THREE.Mesh(geo,(i%2?matB:matA));m.userData.dark=(i%2);g.add(m);chevs.push(m);}
+  g.userData={at,segDir,chevs,COUNT,len:pathLen(at),phase:0};arrows.push(g);
+  // 바닥 경로선 (어두운 외곽 + 컬러선)
+  const lpts=[];for(let i=0;i<=60;i++)lpts.push(at(i/60));
+  const lg=new THREE.BufferGeometry().setFromPoints(lpts.map(p=>p.clone().setY(0.6)));
+  g.add(new THREE.Line(lg,new THREE.LineBasicMaterial({color:colA,transparent:true,opacity:.55})));
+  return g;
+}
+function makeAirport(){
+  const g=new THREE.Group();
+  const rw=new THREE.Mesh(new THREE.BoxGeometry(22,.5,6),new THREE.MeshStandardMaterial({color:0x3a3f45,roughness:1}));rw.position.y=.3;g.add(rw);
+  for(let x=-9;x<=9;x+=3){const m=new THREE.Mesh(new THREE.BoxGeometry(1.6,.06,.5),new THREE.MeshBasicMaterial({color:0xffffff}));m.position.set(x,.58,0);g.add(m);}
+  const term=new THREE.Mesh(new THREE.BoxGeometry(10,3.4,4),new THREE.MeshStandardMaterial({color:0xccd6dd,roughness:.6,metalness:.2}));term.position.set(0,1.7,6);g.add(term);
+  const roof=new THREE.Mesh(new THREE.CylinderGeometry(2,2,10,16,1,true,0,Math.PI),new THREE.MeshStandardMaterial({color:0x9fb4c4,side:THREE.DoubleSide,metalness:.3}));roof.rotation.z=Math.PI/2;roof.position.set(0,3.4,6);g.add(roof);
+  const tower=new THREE.Mesh(new THREE.CylinderGeometry(.7,.95,7,12),new THREE.MeshStandardMaterial({color:0xb6c2cb}));tower.position.set(-7.5,3.5,7);g.add(tower);
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.6,2.2),new THREE.MeshStandardMaterial({color:0x2b3a47,emissive:0x55708a,emissiveIntensity:.45}));cab.position.set(-7.5,7.6,7);g.add(cab);
+  return g;
+}
+
+// 세부장면 좌표(월드 x,z) → 지도 캔버스 픽셀 (플레인 UV와 정렬)
+function el(x,z){return[(x+40)*6.4,(z+40)*6.4];}
+// 실제 OSM 지도 — 바운딩박스(rMinX,rMinY,size)에 꼭 맞춰 타일을 그림
+function makeMapGround(rMinX,rMinY,size,z){
+  const cv=document.createElement('canvas');cv.width=512;cv.height=512;const c=cv.getContext('2d');
+  const tex=new THREE.CanvasTexture(cv);const tiles=[];const n=Math.pow(2,z);
+  function rect(tx,ty){const x0=((tx/n-rMinX)/size)*512,x1=(((tx+1)/n-rMinX)/size)*512,y0=((ty/n-rMinY)/size)*512,y1=(((ty+1)/n-rMinY)/size)*512;return [x0,y0,x1-x0,y1-y0];}
+  function redraw(){
+    c.save();c.beginPath();c.arc(256,256,256,0,7);c.clip();
+    c.fillStyle='#2a3138';c.fillRect(0,0,512,512);
+    tiles.forEach(t=>{const r=rect(t.tx,t.ty);c.drawImage(t.img,r[0],r[1],r[2],r[3]);});
+    c.fillStyle='#0c162022';c.fillRect(0,0,512,512);
+    const rg=c.createRadialGradient(256,256,184,256,256,256);rg.addColorStop(0,'#00000000');rg.addColorStop(1,'#0c1620dd');c.fillStyle=rg;c.fillRect(0,0,512,512);
+    c.restore();tex.needsUpdate=true;
+  }
+  redraw();
+  const tx0=Math.floor(rMinX*n),tx1=Math.floor((rMinX+size)*n),ty0=Math.floor(rMinY*n),ty1=Math.floor((rMinY+size)*n);
+  for(let tx=tx0;tx<=tx1;tx++)for(let ty=ty0;ty<=ty1;ty++){
+    const img=new Image();img.crossOrigin='anonymous';
+    (function(TX,TY,im){im.onload=function(){tiles.push({img:im,tx:TX,ty:TY});redraw();};})(tx,ty,img);
+    img.src='https://tile.openstreetmap.org/'+z+'/'+tx+'/'+ty+'.png';
+  }
+  const grp=new THREE.Group();
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(40,40,1.2,64),new THREE.MeshStandardMaterial({color:0x222a31,roughness:1}));base.position.y=-0.6;grp.add(base);
+  const plane=new THREE.Mesh(new THREE.PlaneGeometry(80,80),new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:1}));
+  plane.rotation.x=-Math.PI/2;plane.position.y=0.02;grp.add(plane);
+  return grp;
+}
+function buildDetail(city){
+  const D=DETAILS[city.key];
+  // geo 아이템 바운딩박스에 지도를 자동으로 꼭 맞춤 (뭉침 방지 — 가까운 장소도 디스크 전체로 펼침)
+  const mpts=[];D.items.forEach(it=>{if(it.g)mpts.push([mlon(it.g[1]),mlat(it.g[0])]);});
+  const minX=Math.min.apply(null,mpts.map(p=>p[0])),maxX=Math.max.apply(null,mpts.map(p=>p[0]));
+  const minY=Math.min.apply(null,mpts.map(p=>p[1])),maxY=Math.max.apply(null,mpts.map(p=>p[1]));
+  const cX=(minX+maxX)/2,cY=(minY+maxY)/2;
+  const size=Math.max(maxX-minX,maxY-minY,1e-5)*1.7; // 패딩 70%
+  const rMinX=cX-size/2,rMinY=cY-size/2;
+  function geoXZ(lat,lon){return [((mlon(lon)-rMinX)/size)*512/6.4-40, ((mlat(lat)-rMinY)/size)*512/6.4-40];}
+  let z=Math.round(Math.log2(4/size));z=Math.max(11,Math.min(17,z));
+  const g=new THREE.Group();
+  g.add(makeMapGround(rMinX,rMinY,size,z)); // 실제 OSM 지도 바닥 (자동맞춤)
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(40,.6,8,64),new THREE.MeshStandardMaterial({color:city.hex,emissive:city.hex,emissiveIntensity:.3}));
+  rim.rotation.x=Math.PI/2;g.add(rim);
+  billboards=[];arrows=[];fountains=[];bobbers=[];dPick=[];dVehicles=[];
+  const POS=[];
+  D.items.forEach((it,idx)=>{
+    const pp=it.g?geoXZ(it.g[0],it.g[1]):it.pos; POS[idx]=pp; const px=pp[0],pz=pp[1];
+    let obj;
+    if(it.type==='building')obj=makeBuilding(it.color||0xb0653a);
+    else if(it.type==='landmark')obj=makeBuilding(it.color||0xb89a64);
+    else if(it.type==='wine')obj=makeBuilding(it.color||0x7a3b3b);
+    else if(it.type==='station')obj=makeStation(it.palms);
+    else if(it.type==='fountain')obj=makeFountain();
+    else if(it.type==='park')obj=makePark();
+    else if(it.type==='ticket')obj=makeTicket();
+    else if(it.type==='camera')obj=makeCamera();
+    else if(it.type==='billboard')obj=makeBillboard(it.img,it.label);
+    else if(it.type==='airport')obj=makeAirport();
+    else if(it.type==='tower')obj=makeTower(it.color);
+    else if(it.type==='spires')obj=makeSpires(it.color);
+    else if(it.type==='bridge')obj=makeBridge(it.color);
+    else obj=makeBuilding(0x999999);
+    const SC={airport:0.24,station:0.22,building:0.24,landmark:0.24,wine:0.24,fountain:0.28,park:0.32,ticket:0.46,camera:0.4,billboard:0.44,tower:0.3,spires:0.32,bridge:0.3}[it.type]||0.26;
+    obj.scale.setScalar(SC);
+    obj.position.set(px,0,pz);g.add(obj);
+    const icon={building:'🏨',landmark:'🏛️',wine:'🍷',station:'🚉',fountain:'⛲',park:'🌳',ticket:'🎟️',camera:'📷',billboard:'🖼️',airport:'✈️',tower:'🗼',spires:'⛪',bridge:'🌉'}[it.type]||'📍';
+    const lb=makeLabel(icon+' '+it.label,'#0c1620e6');
+    const ly={billboard:12,station:4,building:4.5,landmark:4.5,wine:4.5,airport:4,park:4,fountain:4,ticket:4,camera:3.5,tower:6,spires:6.5,bridge:4}[it.type]||4.5;
+    lb.position.set(px,ly,pz);g.add(lb);
+    obj.userData.pick={label:it.label,sub:it.sub,photos:it.photos,icon:icon};dPick.push(obj);
+  });
+  // 도보 동선(청록 투톤) + 픽업(주황) + 순번 뱃지 — 인덱스로 위치 참조
+  const routePts=D.route.map(i=>POS[i]).filter(Boolean);
+  g.add(makeArrowFlow(routePts,0x18d6c2,0x0b7d74));
+  // 픽업(차량 이동)은 화살표 대신 버스/밴이 경로를 달림
+  if(D.pickup){const pts=D.pickup.map(i=>POS[i]).filter(Boolean);
+    if(pts.length>=2){
+      const path=pts.map(p=>new THREE.Vector3(p[0],1.4,p[1]));
+      const at=function(t){const seg=(path.length-1)*t;const i=Math.min(Math.floor(seg),path.length-2);return path[i].clone().lerp(path[i+1],seg-i);};
+      const lpts=[];for(let k=0;k<=40;k++)lpts.push(at(k/40));
+      g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(lpts),new THREE.LineBasicMaterial({color:0xffce6a,transparent:true,opacity:.55})));
+      const pbus=makeBus(0xffb020);pbus.scale.setScalar(0.4);
+      pbus.userData.path=at;pbus.userData.fixedDir=pathDirFlat(at);pbus.userData.spd=12*0.016/pathLen(at);
+      g.add(pbus);dVehicles.push(pbus);
+    }
+  }
+  routePts.forEach((p,i)=>{const b=makeNumBadge(i+1);b.position.set(p[0],3.6,p[1]);g.add(b);});
+  // 도착 탈것 — 터미널 위치에서 외곽(바깥쪽)으로부터 진입
+  const A=D.arrive;let veh;
+  if(A.mode==='plane')veh=makeAirplane(city.hex);
+  else if(A.mode==='train')veh=makeTrain(0xc2ccd4);
+  else veh=makeBus(0xe0a030);
+  const ap=POS[D.arrItem]||[0,30];const av=new THREE.Vector3(ap[0],0,ap[1]);
+  let ad=av.clone();if(ad.lengthSq()<1)ad.set(0,0,1);ad.normalize();
+  const fromA=av.clone().addScaledVector(ad,30),toA=av.clone();
+  fromA.y=(A.mode==='plane')?44:1.2;toA.y=(A.mode==='plane')?4:1.2;
+  veh.userData.path=t=>fromA.clone().lerp(toA,t);
+  veh.userData.fixedDir=pathDirFlat(veh.userData.path);
+  veh.userData.spd=12*0.016/pathLen(veh.userData.path);
+  g.add(veh);dVehicles.push(veh);
+  // 출국 비행기 (이륙) — 공항에서 솟아올라 바깥으로
+  if(D.depItem!=null){const dp=POS[D.depItem]||[0,-30];const dv=new THREE.Vector3(dp[0],4,dp[1]);
+    let dd=new THREE.Vector3(dp[0],0,dp[1]);if(dd.lengthSq()<1)dd.set(0,0,-1);dd.normalize();
+    const t2=dv.clone().addScaledVector(dd,34);t2.y=46;
+    const v2=makeAirplane(0xf2c64b);v2.userData.path=t=>dv.clone().lerp(t2,t);
+    v2.userData.fixedDir=pathDirFlat(v2.userData.path);v2.userData.spd=12*0.016/pathLen(v2.userData.path);
+    g.add(v2);dVehicles.push(v2);
+  }
+  return g;
+}
+
+// ---- 모드 전환 ----
+function enterDetail(city){
+  if(!city.detail)return;
+  mode='detail';idle=false;rotY=0.2;elev=0.82;curDist=DIST_DETAIL;tgtX=0;tgtZ=0;updateCamera();
+  mapG.visible=false;
+  if(detailG){scene.remove(detailG);}
+  detailG=buildDetail(city);scene.add(detailG);
+  closePopup(true);
+  document.getElementById('legend').style.display='none';
+  document.getElementById('backbtn').style.display='block';
+  document.getElementById('dlegend').style.display='flex';
+  const cap=document.getElementById('dcap');cap.style.display='block';
+  document.getElementById('dcap-t').textContent=DETAILS[city.key].mood.t;
+  document.getElementById('dcap-s').textContent=DETAILS[city.key].mood.s+'   ·   지도 © OpenStreetMap';
+  document.getElementById('title').textContent=city.name+' — 세부 3D 장면';
+  document.getElementById('hint').innerHTML='<b>드래그</b> 회전 · <b>휠</b> 확대 · <b>요소 클릭</b> 사진(겹치면 선택) · <b>← 거점 지도로</b>';
+}
+function exitDetail(){
+  hidePhoto();hidePickMenu();
+  mode='map';rotY=0.35;elev=0.82;curDist=DIST_MAP;tgtX=0;tgtZ=0;updateCamera();idle=true;
+  if(detailG){scene.remove(detailG);detailG=null;}
+  mapG.visible=true;
+  document.getElementById('legend').style.display='flex';
+  document.getElementById('backbtn').style.display='none';
+  document.getElementById('dlegend').style.display='none';
+  document.getElementById('dcap').style.display='none';
+  document.getElementById('title').textContent='스페인 · 포르투갈 — 거점 3D 지도';
+  document.getElementById('hint').innerHTML='<b>드래그</b> 좌우 회전 · <b>말 클릭</b> 거점 정보 · <b>◀ ▶</b> 점점 깊은 정보';
+}
+
+// ---- 상호작용 ----
+let dragging=false,moved=false,lx=0,ly=0;
+function bindEvents(){
+  const el=renderer.domElement;
+  const ptrs=new Map();let pinchD=0;
+  function ptrDist(){const a=[...ptrs.values()];return Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);}
+  function zoomBy(f){idle=false;curDist*=f;const lim=(mode==='detail')?[26,180]:[140,360];curDist=Math.max(lim[0],Math.min(lim[1],curDist));updateCamera();}
+  el.addEventListener('pointerdown',e=>{ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});dragging=true;moved=false;idle=false;lx=e.clientX;ly=e.clientY;if(ptrs.size===2)pinchD=ptrDist();});
+  el.addEventListener('pointermove',e=>{
+    if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(ptrs.size>=2){const d=ptrDist();if(pinchD>0)zoomBy(pinchD/d);pinchD=d;moved=true;return;} // 두 손가락 핀치 줌
+    if(!dragging)return;const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;if(Math.abs(dx)+Math.abs(dy)>2)moved=true;rotY+=dx*0.006;elev+=dy*0.004;updateCamera();
+  });
+  el.addEventListener('pointerup',e=>{const wasMulti=ptrs.size>=2;ptrs.delete(e.pointerId);if(ptrs.size<2)pinchD=0;dragging=ptrs.size>0;if(ptrs.size===0&&!moved&&!wasMulti)pick(e);});
+  el.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);if(ptrs.size<2)pinchD=0;dragging=ptrs.size>0;});
+  el.addEventListener('wheel',e=>{e.preventDefault();zoomBy(Math.exp(e.deltaY*0.0016));},{passive:false});
+  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+  document.getElementById('p-close').onclick=()=>closePopup();
+  document.getElementById('p-prev').onclick=()=>step(-1);
+  document.getElementById('p-next').onclick=()=>step(1);
+  document.getElementById('p-detail').onclick=()=>{if(curCity&&curCity.detail)enterDetail(curCity);};
+  document.getElementById('backbtn').onclick=exitDetail;
+  document.getElementById('dphoto-x').onclick=hidePhoto;
+  document.getElementById('dphoto-prev').onclick=()=>photoStep(-1);
+  document.getElementById('dphoto-next').onclick=()=>photoStep(1);
+  document.getElementById('dphoto').addEventListener('click',e=>{if(e.target.id==='dphoto')hidePhoto();});
+}
+let gPhotos=[],gIdx=0;
+function showPhoto(pk){
+  document.getElementById('dphoto-t').textContent=pk.label;
+  document.getElementById('dphoto-s').textContent=pk.sub||'';
+  gPhotos=(pk.photos&&pk.photos.length)?pk.photos:[];gIdx=0;
+  renderPhoto();
+  document.getElementById('dphoto').classList.add('on');
+}
+function renderPhoto(){
+  const img=document.getElementById('dphoto-img'),ph=document.getElementById('dphoto-ph');
+  const cnt=document.getElementById('dphoto-count'),pv=document.getElementById('dphoto-prev'),nx=document.getElementById('dphoto-next');
+  if(!gPhotos.length){img.style.display='none';ph.style.display='block';ph.textContent='(사진 없음)';cnt.textContent='';pv.style.display=nx.style.display='none';return;}
+  const multi=gPhotos.length>1;pv.style.display=nx.style.display=multi?'flex':'none';
+  cnt.textContent=(gIdx+1)+' / '+gPhotos.length;
+  img.style.display='none';ph.style.display='block';ph.textContent='사진 불러오는 중…';
+  img.onload=()=>{ph.style.display='none';img.style.display='block';};
+  img.onerror=()=>{ph.textContent='사진을 불러오지 못했어요';img.style.display='none';};
+  img.src=encodeURI(gPhotos[gIdx]);
+}
+function photoStep(d){if(!gPhotos.length)return;gIdx=(gIdx+d+gPhotos.length)%gPhotos.length;renderPhoto();}
+function hidePhoto(){document.getElementById('dphoto').classList.remove('on');}
+function pick(e){
+  const r=renderer.domElement.getBoundingClientRect();
+  pointer.x=((e.clientX-r.left)/r.width)*2-1;pointer.y=-((e.clientY-r.top)/r.height)*2+1;
+  raycaster.setFromCamera(pointer,camera);
+  if(mode==='map'){
+    const hit=raycaster.intersectObjects(pawns,true);
+    if(hit.length){let o=hit[0].object;while(o&&!(o.userData&&o.userData.city))o=o.parent;if(o)selectCity(o);else closePopup();}else closePopup();
+  }else{
+    // 세부: 화면상 클릭 근처 오브젝트를 모아 겹침 처리
+    const px=e.clientX-r.left, py=e.clientY-r.top, near=[], v=new THREE.Vector3();
+    dPick.forEach(o=>{o.getWorldPosition(v);v.project(camera);if(v.z>1)return;
+      const sx=(v.x*0.5+0.5)*r.width, sy=(-v.y*0.5+0.5)*r.height, d=Math.hypot(sx-px,sy-py);
+      if(d<58)near.push({o,d});});
+    near.sort((a,b)=>a.d-b.d);
+    if(near.length===0){hidePickMenu();}
+    else if(near.length===1){hidePickMenu();showPhoto(near[0].o.userData.pick);}
+    else showPickMenu(near.map(n=>n.o),e.clientX,e.clientY);
+  }
+}
+function showPickMenu(list,x,y){
+  const m=document.getElementById('dpickmenu');
+  m.innerHTML='<div class="hh">겹친 장소 — 선택</div>';
+  list.forEach(o=>{const pk=o.userData.pick,d=document.createElement('div');d.className='pm';
+    d.textContent=(pk.icon||'📍')+' '+pk.label;
+    d.onclick=ev=>{ev.stopPropagation();hidePickMenu();showPhoto(pk);};m.appendChild(d);});
+  m.style.left=Math.min(x,innerWidth-210)+'px';m.style.top=Math.min(y,innerHeight-44*list.length-40)+'px';m.style.display='block';
+}
+function hidePickMenu(){const m=document.getElementById('dpickmenu');if(m)m.style.display='none';}
+let curCity=null,curLayer=0,selected=null;
+function selectCity(g){
+  if(selected&&selected!==g){selected.userData.mats.forEach(m=>m.emissiveIntensity=0);selected.scale.set(1,1,1);selected.position.y=selected.userData.base;}
+  selected=g;g.userData.mats.forEach(m=>m.emissiveIntensity=0.5);g.scale.set(1.14,1.14,1.14);
+  curCity=g.userData.city;curLayer=0;renderPopup();document.getElementById('popup').classList.add('on');
+}
+function step(d){if(!curCity)return;const n=curCity.layers.length;curLayer=(curLayer+d+n)%n;renderPopup();}
+function renderPopup(){
+  const c=curCity,L=c.layers[curLayer];
+  document.getElementById('card').style.setProperty('--c',c.css);
+  document.getElementById('p-chip').textContent=c.order;
+  document.getElementById('p-name').firstChild.textContent=c.name;
+  document.getElementById('p-en').textContent=c.en+' · '+c.lat.toFixed(2)+'°N';
+  document.getElementById('p-ltitle').textContent=L.t;
+  document.getElementById('p-ltext').textContent=L.d;
+  const dots=document.getElementById('p-dots');dots.innerHTML='';
+  c.layers.forEach((_,i)=>{const d=document.createElement('div');d.className='d'+(i===curLayer?' on':'');dots.appendChild(d);});
+  document.getElementById('p-depth').textContent='깊이 '+(curLayer+1)+' / '+c.layers.length+'  ·  ◀ ▶ 로 더 깊이';
+  const btn=document.getElementById('p-detail');
+  if(c.detail){btn.className='detailbtn';btn.textContent='🔍 세부 3D 장면 보기';}
+  else{btn.className='detailbtn dim';btn.textContent='세부 장면 준비 중 (마드리드부터)';}
+}
+function closePopup(keepSel){
+  document.getElementById('popup').classList.remove('on');
+  if(!keepSel&&selected){selected.userData.mats.forEach(m=>m.emissiveIntensity=0);selected.scale.set(1,1,1);selected.position.y=selected.userData.base;selected=null;curCity=null;}
+}
+function buildLegend(){
+  const L=document.getElementById('legend');
+  CITIES.forEach(c=>{const it=document.createElement('div');it.className='it';
+    it.innerHTML='<span class="dot" style="background:'+c.css+'"></span>'+c.order+'. '+c.name;
+    it.onclick=()=>{const m=pawns.find(p=>p.userData.city===c);selectCity(m);};L.appendChild(it);});
+}
+
+// 회전된 지도 안에서도 어긋나지 않게, 로컬 방향으로 직접 정렬 (lookAt=월드기준이라 안 씀)
+const _UP=new THREE.Vector3(0,1,0),_FWD=new THREE.Vector3(0,0,1);
+function faceLocal(obj,pos,dir,fromAxis){obj.position.copy(pos);obj.quaternion.setFromUnitVectors(fromAxis,dir);}
+function pathDir(fn){const a=fn(0),b=fn(1);const d=b.clone().sub(a);if(d.lengthSq()<1e-7)return new THREE.Vector3(0,0,1);return d.normalize();}
+// 수평 진행 방향만 (피치/롤 없이 yaw만 — 비행기/탈것 수평 유지)
+function pathDirFlat(fn){const d=pathDir(fn);d.y=0;if(d.lengthSq()<1e-6)return new THREE.Vector3(0,0,1);return d.normalize();}
+// 경로 실제 길이 (등속 이동용 — 거리가 길어도 속도 일정)
+function pathLen(fn){let L=0,prev=fn(0);for(let k=1;k<=24;k++){const p=fn(k/24);L+=p.distanceTo(prev);prev=p;}return Math.max(L,0.001);}
+// 동선 순번 뱃지
+function makeNumBadge(n){
+  const cv=document.createElement('canvas');cv.width=96;cv.height=96;const c=cv.getContext('2d');
+  c.fillStyle='#18d6c2';c.beginPath();c.arc(48,48,40,0,7);c.fill();
+  c.lineWidth=7;c.strokeStyle='#073b37';c.stroke();
+  c.fillStyle='#06322e';c.font='bold 54px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(n,48,52);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthTest:false}));
+  sp.scale.set(1.8,1.8,1);return sp;
+}
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);t+=0.016;
+  if(mode==='map'){
+    if(idle)rotY+=0.0022;mapG.rotation.y=rotY;
+    planes.forEach(pl=>{pl.userData.p=(pl.userData.p+pl.userData.spd)%1;faceLocal(pl,pl.userData.path(pl.userData.p),pl.userData.fixedDir,_FWD);});
+    if(selected)selected.position.y=selected.userData.base+Math.sin(t*3)*0.5+0.6;
+  }else if(detailG){
+    detailG.rotation.y=rotY;
+    // 빌보드 정면
+    billboards.forEach(b=>b.rotation.y=-rotY);
+    // 분수
+    fountains.forEach(f=>{const w=f.userData.water,arr=w.pts.geometry.attributes.position.array;
+      for(let i=0;i<w.N;i++){let p=w.vel[i];p.y+=0.05;let yy=(p.y%2.2);let up=5+yy*1.6-yy*yy*1.1;
+        arr[i*3]=Math.cos(p.a)*p.s*yy;arr[i*3+1]=Math.max(2,up);arr[i*3+2]=Math.sin(p.a)*p.s*yy;}
+      w.pts.geometry.attributes.position.needsUpdate=true;});
+    // 화살표 흐름
+    arrows.forEach(g=>{const u=g.userData;u.phase=(u.phase+0.016*8/u.len)%1;for(let i=0;i<u.COUNT;i++){let tt=(u.phase+i/u.COUNT)%1;faceLocal(u.chevs[i],u.at(tt),u.segDir(tt),_UP);}});
+    // 입장권 흔들
+    bobbers.forEach(g=>{g.position.y=g.userData.base+Math.sin(t*2.4)*1.0;g.rotation.y=Math.sin(t*1.2)*0.5;});
+    // 카메라 살짝
+    detailG.traverse(o=>{if(o.userData&&o.userData.spin)o.rotation.y=Math.sin(t*0.8)*0.3;});
+    // 도착 비행기
+    dVehicles.forEach(v=>{v.userData.p=(v.userData.p+(v.userData.spd||0.0035))%1;faceLocal(v,v.userData.path(v.userData.p),v.userData.fixedDir,_FWD);});
+  }
+  renderer.render(scene,camera);
+}
+function showLoadMsg(html){var l=document.getElementById('loading');if(l){l.style.display='flex';l.style.padding='0 28px';l.style.textAlign='center';l.style.lineHeight='1.7';l.innerHTML=html;}}
+window.addEventListener('error',function(ev){showLoadMsg('문제가 생겼어요: '+((ev&&ev.message)||'알 수 없는 오류')+'<br><br>이 3D 지도는 <b>Safari·Chrome 같은 정식 브라우저</b>에서 인터넷 연결로 열어주세요.');});
+if(window.__threeFail||typeof THREE==='undefined'){
+  showLoadMsg('이 <b>3D 지도</b>는 카카오톡 인앱 창이나 미리보기에서는 안 열려요.<br><br>우측 상단/하단의 <b>공유·⋮ 메뉴</b>에서 <b>“Safari로 열기 / Chrome으로 열기”</b>를 눌러 정식 브라우저로 열어주세요.<br>(인터넷 연결 필요)');
+}else{
+  try{init();}catch(e){showLoadMsg('오류: '+e.message+'<br><br><b>Safari·Chrome</b>에서 열어주세요.');}
+}
+</script>
+</body>
+</html>
